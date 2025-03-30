@@ -87,6 +87,11 @@ namespace aspect
                 melt_fractions[q] = tian2019_model.melt_fraction(in, porosity_idx, q);
                 break;
               }
+              case magemin:
+              {
+                melt_fractions[q] = mageM.melt_fraction(in, q);
+                break;
+              }
               case katz2003:
               {
                 melt_fractions[q] = katz2003_model.melt_fraction(in.temperature[q],
@@ -228,6 +233,15 @@ namespace aspect
           }
           prm.leave_subsection();
 
+
+          prm.enter_subsection("magemin model");
+          {
+            ReactionModel::mageminLookup<dim>::declare_parameters(prm);
+          }
+          prm.leave_subsection();
+
+
+
           prm.declare_entry("Base model","visco plastic",
                             Patterns::Selection(MaterialModel::get_valid_model_names_pattern<dim>()),
                             "The name of a material model incorporating the "
@@ -285,7 +299,7 @@ namespace aspect
                              "Units: yr or s, depending on the ``Use years "
                              "in output instead of seconds'' parameter.");
           prm.declare_entry ("Fluid-solid reaction scheme", "no reaction",
-                             Patterns::Selection("no reaction|zero solubility|tian approximation|katz2003"),
+                             Patterns::Selection("no reaction|zero solubility|tian approximation|katz2003|magemin"),
                              "Select what type of scheme to use for reactions between fluid and solid phases. "
                              "The current available options are models where no reactions occur between "
                              "the two phases, or the solid phase is insoluble (zero solubility) and all "
@@ -370,6 +384,16 @@ namespace aspect
               }
               prm.leave_subsection();
             }
+          else if (prm.get ("Fluid-solid reaction scheme") == "magemin")
+            {
+              fluid_solid_reaction_scheme = magemin;
+              prm.enter_subsection("magemin model");
+              {
+                mageM.initialize_simulator (this->get_simulator());
+                mageM.parse_parameters(prm);
+              }
+              prm.leave_subsection();
+            }
           else
             AssertThrow(false, ExcMessage("Not a valid fluid-solid reaction scheme"));
 
@@ -408,7 +432,7 @@ namespace aspect
                       ExcMessage("Material model Reactive Fluid Transport only "
                                  "works if there is a compositional field called porosity."));
 
-          if (fluid_solid_reaction_scheme != katz2003)
+          if (fluid_solid_reaction_scheme != katz2003 || fluid_solid_reaction_scheme != magemin)
             {
               AssertThrow(this->introspection().compositional_name_exists("bound_fluid"),
                           ExcMessage("Material model Reactive Fluid Transport only "
@@ -424,6 +448,14 @@ namespace aspect
         prm.leave_subsection();
       }
       prm.leave_subsection();
+
+      // I want to read and initialize the lookup-tables here; to avoid reading them everytime;
+      if(fluid_solid_reaction_scheme == magemin)
+      {
+        std::cout<<"Initializing magemin FIle"<<std::endl;
+        mageM.initialize();
+      }
+      
 
       // After parsing the parameters for this model, parse parameters related to the base model.
       base_model->parse_parameters(prm);

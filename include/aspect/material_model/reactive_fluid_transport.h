@@ -30,6 +30,7 @@
 #include <aspect/melt.h>
 #include <aspect/material_model/reaction_model/katz2003_mantle_melting.h>
 #include <aspect/material_model/reaction_model/tian2019_solubility.h>
+#include <aspect/material_model/reaction_model/magemin_lookup.h>
 
 namespace aspect
 {
@@ -148,6 +149,11 @@ namespace aspect
         * Object for computing Katz 2003 melt parameters
         */
         ReactionModel::Katz2003MantleMelting<dim> katz2003_model;
+        
+        /*
+        * Object for computing magemin melt parameters
+        */
+        ReactionModel::mageminLookup<dim> mageM;
 
         /*
         * Object for computing Tian 2019 parameterized solubility parameters
