@@ -207,6 +207,7 @@ namespace aspect
           no_reaction,
           zero_solubility,
           tian_approximation,
+          magemin,
           katz2003
         }
         fluid_solid_reaction_scheme;

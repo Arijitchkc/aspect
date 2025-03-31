@@ -18,6 +18,7 @@
   <http://www.gnu.org/licenses/>.
 */
 
+
 #include <aspect/material_model/reactive_fluid_transport.h>
 #include <aspect/adiabatic_conditions/interface.h>
 #include <deal.II/base/parameter_handler.h>
@@ -63,6 +64,7 @@ namespace aspect
       for (unsigned int q=0; q<in.n_evaluation_points(); ++q)
         {
           const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
+          const unsigned int peridotite_idx = this->introspection().compositional_index_for_name("peridotite");
           switch (fluid_solid_reaction_scheme)
             {
               case no_reaction:
@@ -134,7 +136,7 @@ namespace aspect
     {
       base_model->evaluate(in,out);
 
-      if (fluid_solid_reaction_scheme != katz2003)
+      if (fluid_solid_reaction_scheme != katz2003 || fluid_solid_reaction_scheme != magemin)
         {
           const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
 
@@ -205,7 +207,13 @@ namespace aspect
                   }
             }
         }
-      else
+      else if(fluid_solid_reaction_scheme == magemin)
+        {
+          
+          mageM.calculate_reaction_rate_outputs(in, out);
+          mageM.calculate_fluid_outputs(in, out, reference_T);
+        }
+      else if(fluid_solid_reaction_scheme == katz2003)
         {
           katz2003_model.calculate_reaction_rate_outputs(in, out);
           katz2003_model.calculate_fluid_outputs(in, out, reference_T);
@@ -454,6 +462,7 @@ namespace aspect
       {
         std::cout<<"Initializing magemin FIle"<<std::endl;
         mageM.initialize();
+        mageM.initializeNewandModern();
       }
       
 

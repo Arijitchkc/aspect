@@ -18,14 +18,38 @@ namespace aspect
   {
     namespace ReactionModel
     {   
+        struct magelookupFile
+        {
+            std::vector<double> Pressure;
+            std::vector<double> Temperature;
+            std::vector<std::vector<double>> materialProperties;
+        };
+        
         namespace internal
         {
             class readLookUpTable
             {
                 public:
                     readLookUpTable(const std::string &filename);
+
                     std::vector<std::vector<double>> getData() const;
                     std::vector<std::vector<double>> data_magemin;
+            // private:
+            };
+        }
+
+        namespace internal2
+        {
+            class readLookUpTable
+            {
+                public:
+                    // readLookUpTable(const std::string &filename);
+
+                    readLookUpTable(std::string data_directory_magemin, std::vector<std::string>& compositionalLookupFileNames, std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles);
+                    magelookupFile getData() const;
+                    // std::vector<std::vector<double>> data_magemin;
+                private:
+                    magelookupFile lF;
             // private:
             };
         }
@@ -58,11 +82,21 @@ namespace aspect
                 double
                 melt_fraction (const MaterialModel::MaterialModelInputs<dim> &in, unsigned int q) const;
 
-                void
-                Katz2003MantleMelting<dim>::
-                calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
+                void calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
                                                 typename Interface<dim>::MaterialModelOutputs &out) const;
 
+                void calculate_fluid_outputs(const typename Interface<dim>::MaterialModelInputs &in,
+                                       typename Interface<dim>::MaterialModelOutputs &out,
+                                       const double reference_T) const;
+
+                void initialize();
+                void initializeNewandModern();
+
+                // create a pointer to the structure holding magemin lookuptable properties
+                std::vector<std::unique_ptr<magelookupFile>> magelookupFiles;
+                std::vector<std::string> fileNames;
+                std::vector<std::string> compositionalLookupNames;
+                std::vector<std::string> compositionalLookupFileNames;
 
             private:
                 double reference_rho_fluid;
@@ -105,6 +139,11 @@ namespace aspect
 
                 std::vector<std::vector<double>> mantle_data;
                 std::vector<std::vector<double>> crust_data;
+
+                std::vector<std::vector<double>> compositionalLookupNames;
+                std::vector<std::vector<double>> compositionalLookupFileNames;
+
+
         };
     }
   }
