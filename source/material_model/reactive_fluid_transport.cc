@@ -64,7 +64,7 @@ namespace aspect
       for (unsigned int q=0; q<in.n_evaluation_points(); ++q)
         {
           const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
-          const unsigned int peridotite_idx = this->introspection().compositional_index_for_name("peridotite");
+          // const unsigned int peridotite_idx = this->introspection().compositional_index_for_name("peridotite");
           switch (fluid_solid_reaction_scheme)
             {
               case no_reaction:
@@ -136,7 +136,7 @@ namespace aspect
     {
       base_model->evaluate(in,out);
 
-      if (fluid_solid_reaction_scheme != katz2003 || fluid_solid_reaction_scheme != magemin)
+      if (fluid_solid_reaction_scheme != katz2003) // || fluid_solid_reaction_scheme != magemin)
         {
           const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
 
@@ -207,12 +207,12 @@ namespace aspect
                   }
             }
         }
-      else if(fluid_solid_reaction_scheme == magemin)
-        {
+      // else if(fluid_solid_reaction_scheme == magemin)
+      //   {
           
-          mageM.calculate_reaction_rate_outputs(in, out);
-          mageM.calculate_fluid_outputs(in, out, reference_T);
-        }
+      //     mageM.calculate_reaction_rate_outputs(in, out);
+      //     mageM.calculate_fluid_outputs(in, out, reference_T);
+      //   }
       else if(fluid_solid_reaction_scheme == katz2003)
         {
           katz2003_model.calculate_reaction_rate_outputs(in, out);

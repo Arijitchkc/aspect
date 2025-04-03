@@ -20,17 +20,18 @@ namespace aspect
     {   
         struct magelookupFile
         {
+            std::string compositionName;
             std::vector<double> Pressure;
             std::vector<double> Temperature;
             std::vector<std::vector<double>> materialProperties;
         };
-        
+
         namespace internal
         {
             class readLookUpTable
             {
                 public:
-                    readLookUpTable(const std::string &filename);
+                    readLookUpTable(const std::string &filename, const MPI_Comm comm);
 
                     std::vector<std::vector<double>> getData() const;
                     std::vector<std::vector<double>> data_magemin;
@@ -40,16 +41,16 @@ namespace aspect
 
         namespace internal2
         {
-            class readLookUpTable
+            class readLookUpTableFunky
             {
                 public:
                     // readLookUpTable(const std::string &filename);
 
-                    readLookUpTable(std::string data_directory_magemin, std::vector<std::string>& compositionalLookupFileNames, std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles);
+                    readLookUpTableFunky(std::string data_directory_magemin, std::vector<std::string>& compositionalLookupFileNames, std::vector<std::string>& compositionalLookupNames, std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles, const MPI_Comm comm);
                     magelookupFile getData() const;
                     // std::vector<std::vector<double>> data_magemin;
                 private:
-                    magelookupFile lF;
+                    magelookupFile magelF;
             // private:
             };
         }
@@ -59,8 +60,19 @@ namespace aspect
         class mageminLookup : public ::aspect::SimulatorAccess<dim>
         {
             public:
+
                 // constructor
                 mageminLookup();
+
+                // create a pointer to the structure holding magemin lookuptable properties
+
+                std::vector<std::unique_ptr<magelookupFile>> magelookupFiles;
+                std::unique_ptr<internal2::readLookUpTableFunky> allDataPtr;
+                
+                std::vector<std::string> fileNames;
+
+                std::vector<std::string> compositionalLookupNames;
+                std::vector<std::string> compositionalLookupFileNames;
 
                 /**
                  * Declare the parameters this function takes through input files.
@@ -82,23 +94,44 @@ namespace aspect
                 double
                 melt_fraction (const MaterialModel::MaterialModelInputs<dim> &in, unsigned int q) const;
 
-                void calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
-                                                typename Interface<dim>::MaterialModelOutputs &out) const;
+                // void calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
+                //                                 typename Interface<dim>::MaterialModelOutputs &out) const;
 
-                void calculate_fluid_outputs(const typename Interface<dim>::MaterialModelInputs &in,
-                                       typename Interface<dim>::MaterialModelOutputs &out,
-                                       const double reference_T) const;
+                // void calculate_fluid_outputs(const typename Interface<dim>::MaterialModelInputs &in,
+                //                        typename Interface<dim>::MaterialModelOutputs &out,
+                                    //    const double reference_T) const;
 
-                void initialize();
-                void initializeNewandModern();
+                void 
+                initialize();
 
-                // create a pointer to the structure holding magemin lookuptable properties
-                std::vector<std::unique_ptr<magelookupFile>> magelookupFiles;
-                std::vector<std::string> fileNames;
-                std::vector<std::string> compositionalLookupNames;
-                std::vector<std::string> compositionalLookupFileNames;
+                void 
+                initializeNewandModern();
+
+            
+                int 
+                get_closest_index(float T, float P, const std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles, int largestCompIndex) const;
+
+                // struct magelookupFile
+                // {
+                //     std::vector<double> Pressure;
+                //     std::vector<double> Temperature;
+                //     std::vector<std::vector<double>> materialProperties;
+                // };
+
+                
+                
 
             private:
+
+                // void readLookUpTableFunky(std::string data_directory_magemin, std::vector<std::string>& compositionalLookupFileNames, std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles);
+                // magelookupFile lF;
+
+                // void readLookUpTable(const std::string &filename);
+                // std::vector<std::vector<double>> getData() const;
+                // std::vector<std::vector<double>> data_magemin;
+
+
+                
                 double reference_rho_fluid;
                 double xi_0;
                 double viscosity_fluid;
@@ -112,6 +145,7 @@ namespace aspect
                 double freezing_rate;
                 double melting_time_scale;
                 double reference_permeability;
+                double cutOff_depth;
 
                 /**
                  * Magemin lookup table Parameters
@@ -140,10 +174,8 @@ namespace aspect
                 std::vector<std::vector<double>> mantle_data;
                 std::vector<std::vector<double>> crust_data;
 
-                std::vector<std::vector<double>> compositionalLookupNames;
-                std::vector<std::vector<double>> compositionalLookupFileNames;
-
-
+                // std::vector<std::vector<double>> compositionalLookupNames;
+                // std::vector<std::vector<double>> compositionalLookupFileNames;
         };
     }
   }

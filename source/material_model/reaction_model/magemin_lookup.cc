@@ -17,15 +17,19 @@ namespace aspect
         {
             namespace internal
             {
-                readLookUpTable::readLookUpTable(const std::string &filename) 
+                readLookUpTable::readLookUpTable(const std::string &filename, const MPI_Comm comm) 
                 {
 
-                    std::ifstream file(filename);
+                    // std::ifstream file(filename);
                     std::string line;
+
+                    // Read data from disk and distribute among processes
+                    std::istringstream file(Utilities::read_and_distribute_file_content(filename, comm));
+
 
                     if (!file) 
                     {
-                        std::cerr << "Error: Unable to open file " << filename << std::endl;
+                        std::cerr << "Error: Unable to open file " << filename << "\n";
                     }
 
                     while (std::getline(file, line)) 
@@ -50,7 +54,7 @@ namespace aspect
                             data_magemin.push_back({row[0],row[1],row[2],row[10]}); // 5th and 6th columns (zero-based index 4 and 5)
                         }
                     } 
-                    file.close();
+                    // file.close();
                 }
 
                 std::vector<std::vector<double>> readLookUpTable::getData() const
@@ -62,18 +66,21 @@ namespace aspect
 
             namespace internal2
             {
-                readLookUpTable::readLookUpTable(std::string data_directory_magemin, std::vector<std::string>& compositionalLookupFileNames, std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles)
+                readLookUpTableFunky::readLookUpTableFunky(std::string data_directory_magemin, std::vector<std::string>& compositionalLookupFileNames, std::vector<std::string>& compositionalLookupNames, std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles, const MPI_Comm comm)
                 {
                     
                     for(size_t i=0;i<compositionalLookupFileNames.size();i++)
                     {
-                        std::cout<<<"\nReading"<compositionalLookupFileNames[i]<<std::endl;
-                        std::ifstream file(data_directory_magemin+compositionalLookupFileNames[i]);
+                        // std::cout<<"\nReading"<<compositionalLookupFileNames[i]<<"\n";
+                        // std::ifstream file(compositionalLookupFileNames[i]);
                         std::string line;
+
+                        // Read data from disk and distribute among processes
+                        std::istringstream file(Utilities::read_and_distribute_file_content(data_directory_magemin+compositionalLookupFileNames[i], comm));
 
                         if (!file) 
                         {
-                            std::cerr << "Error: Unable to open file " << compositionalLookupFileNames[i] << std::endl;
+                            std::cerr << "Error: Unable to open file " << compositionalLookupFileNames[i] << "\n";
                         }
 
                         while (std::getline(file, line)) 
@@ -95,19 +102,20 @@ namespace aspect
                             // Ensure there are enough columns before accessing indices
                             if (row.size() >= 17) 
                             {
+                                magelookupFiles[i]->compositionName=compositionalLookupNames[i];
                                 magelookupFiles[i]->Pressure.push_back(row[0]);
                                 magelookupFiles[i]->Temperature.push_back(row[1]);
                                 magelookupFiles[i]->materialProperties.push_back({row[2],row[10]});
                                 // data_magemin.push_back({row[0],row[1],row[2],row[10]}); // 5th and 6th columns (zero-based index 4 and 5)
                             }
                         } 
-                        file.close();
+                        // file.close();
                     }
                 }
-
-                magelookupFile readLookUpTable::getData() const
+                magelookupFile readLookUpTableFunky::getData() const
                 {
-                    return lF;
+                    // dummy=1;
+                    return magelF;
                 }
             }
 
@@ -123,30 +131,25 @@ namespace aspect
             mageminLookup<dim>::initializeNewandModern()
             {
 
-                //variable containing fileNames
-
-                // compositionalLookupNames = Utilities::split_string_list(prm.get("Composition names"), ',');
-                // compositionalLookupFileNames = Utilities::split_string_list(prm.get("File names for compositions"), ',');
-
                 // Create unique_ptr for each magelookupFile structure instance for each material
-                for (size_t i = 0; i < fileNames.size(); i++)
+                for (size_t i = 0; i < compositionalLookupFileNames.size(); i++)
                 {
                     magelookupFiles.push_back(std::make_unique<magelookupFile>());
                 }
-                auto allDataPtr = std::make_unique<internal2::readLookUpTable>(data_directory_magemin, compositionalLookupFileNames, magelookupFiles);
+                allDataPtr = std::make_unique<internal2::readLookUpTableFunky>(data_directory_magemin, compositionalLookupFileNames, compositionalLookupNames, magelookupFiles, this->get_mpi_communicator());
 
 
-
-                // Verifying Data
-                for (size_t i = 0; i < magelookupFiles.size(); i++)
-                {
-                    std::cout<<"Printing "<<compositionalLookupFileNames[i]<<std::endl;
-                    std::cout<<"Printing "<<magelookupFiles[i]->Pressure.size()<<std::endl;
-                    for (int j = 0; j < 3; j++)
-                    {
-                        std::cout << magelookupFiles[i]->Pressure[j]<<"  "<<magelookupFiles[i]->Temperature[j]<<"  "<<magelookupFiles[i]->materialProperties[j][0] << std::endl;
-                    }
-                }
+                // std::cout<<"Initialize new and modern"<<"\n";
+                // // Verifying Data
+                // for (size_t i = 0; i < magelookupFiles.size(); i++)
+                // {
+                //     std::cout<<"Printing "<<compositionalLookupFileNames[i]<<"\n";
+                //     std::cout<<"Printing "<<magelookupFiles[i]->Pressure.size()<<"\n";
+                //     for (int j = 0; j < 2; j++)
+                //     {
+                //         std::cout << magelookupFiles[i]->Pressure[j]<<"  "<<magelookupFiles[i]->Temperature[j]<<"  "<<magelookupFiles[i]->materialProperties[j][0] << "\n";
+                //     }
+                // }
 
             }
 
@@ -157,22 +160,48 @@ namespace aspect
             mageminLookup<dim>::initialize()
             {
 
-                crustLookupData = std::make_unique<internal::readLookUpTable>(data_directory_magemin+crust_data_file_name);
-                mantleLookupData = std::make_unique<internal::readLookUpTable>(data_directory_magemin+mantle_data_file_name);
+                crustLookupData = std::make_unique<internal::readLookUpTable>(data_directory_magemin+crust_data_file_name, this->get_mpi_communicator());
+                mantleLookupData = std::make_unique<internal::readLookUpTable>(data_directory_magemin+mantle_data_file_name, this->get_mpi_communicator());
  
                 mantle_data = mantleLookupData->getData(); 
-                crust_data = mantleLookupData->getData();
+                crust_data = crustLookupData->getData();
 
-                // Iterating using indexes
-                std::cout<<"initialize"<<std::endl;
-                for (int i = 0; i < 2; i++) 
+                // // Iterating using indexes
+                // std::cout<<"initialize"<<"\n";
+                // for (int i = 0; i < 2; i++) 
+                // {
+                //     for (size_t j = 0; j < mantle_data[i].size(); j++) 
+                //     {
+                //         std::cout << mantle_data[i][j] << " ";
+                //     }
+                //     std::cout << "\n";
+                // }
+            }
+
+            template <int dim>
+            int
+            mageminLookup<dim>::
+            get_closest_index(float T, float P, const std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles, int largestCompIndex) const
+            {
+                int closestIndex = -1;
+                double minDiff = 999999999999;
+                std::cout<<"Checking if this works or not"<<magelookupFiles[largestCompIndex]->compositionName;
+                for (size_t i = 0; i < magelookupFiles[largestCompIndex]->Pressure.size(); ++i) 
                 {
-                    for (int j = 0; j < mantle_data[i].size(); j++) 
+                    double diff = std::abs(magelookupFiles[largestCompIndex]->Pressure[i] - P) + std::abs(magelookupFiles[largestCompIndex]->Temperature[i] - T);
+                    if (diff < minDiff) 
                     {
-                        std::cout << mantle_data[i][j] << " ";
+                        minDiff = diff;
+                        closestIndex = i;
                     }
-                    std::cout << std::endl;
                 }
+
+                if(minDiff==999999999999)
+                {
+                    return -999;
+                }
+
+                return closestIndex;
             }
 
 
@@ -190,116 +219,154 @@ namespace aspect
                 const float currT=in.temperature[q]; //in.temperature[q];
                 const float currDepth=this->get_geometry_model().depth(in.position[q]); //this->get_geometry_model().depth(in.position[q]);
 
-                int reqd_index=0;
                 
+                // Put in a check for composition; This is where I call the function to calculate closest P and T conditions;
+                float compVal=0.0;
+                int largestCompIndex=0;
+                int closestMaterialPropertiesIndex=0;
 
-                std::cout<<"inside melt_fraction"<<std::endl;
-                for (int i = 0; i < 2; i++) 
+                if(currDepth<cutOff_depth)
                 {
-                    for (int j = 0; j < mantle_data[i].size(); j++) 
+                    //Loop through all the composition to find the maximum composition
+                    for(size_t comp=0;comp<compositionalLookupNames.size();comp++)
                     {
-                        std::cout << mantle_data[i][j] << " ";
-                    }
-                    std::cout << std::endl;
-                }
-
-                reqd_index=0;
-                // double calcPressure=3000*9.8*currDepth;
-                // currP=calcPressure;
-                if ((currDepth>=5e3) && (currDepth<80e3))
-                {
-                    if(currP<0)
-                    {
-                    currP=0;
-                    }
-
-                    // Magemin file in kbar and Kelvin
-                    float check_min_T=abs(mantle_data[0][1]-currT);
-                    float check_min_P=abs(mantle_data[0][0]*1e8-currP);
-
-                    if((currT<=mantle_max_T+20) && (currT>=mantle_min_T-20) && (currP>=mantle_min_P) && (currP<=mantle_max_P))
-                    {    
-                        int checkFound=999;
-                        for(int i=0;i<mantle_data.size();i++)
+                        const unsigned int comp_idx = this->introspection().compositional_index_for_name(compositionalLookupNames[comp]);
+                        if(in.composition[q][comp_idx]>compVal)
                         {
-                            if((check_min_T>=abs(mantle_data[i][1]-currT)) && (check_min_P>=abs(mantle_data[i][0]*1e+8-currP)))
-                            {
-                                check_min_T=abs(mantle_data[i][1]-currT);
-                                check_min_P=abs(mantle_data[i][0]*1e+8-currP);
-                                reqd_index=i;
-                                checkFound=0;
-                            }
+                            std::cout<<"\n"<<in.composition[q][comp_idx]<<"\n"<<compositionalLookupNames[comp];
+                            largestCompIndex=comp;
+                            compVal=in.composition[q][comp_idx];
                         }
-                        
-                        if(checkFound==0)
-                        {
-                            meltFraction=mantle_data[reqd_index][2]; //+ mantle_data[reqd_index][3];
-                        }
-                        else
-                        {
-                            meltFraction=0.0;
-                        }
-                        
                     }
-                    else
+                    
+                    closestMaterialPropertiesIndex=get_closest_index(currT, currP, magelookupFiles, largestCompIndex);
+
+                    if(closestMaterialPropertiesIndex==-999)
                     {
                         meltFraction=0.0;
                     }
-
-                    // melt_fractions[q]=melt_fraction;
+                    else
+                    {
+                        meltFraction=magelookupFiles[largestCompIndex]->materialProperties[closestMaterialPropertiesIndex][0];
+                    }
+                    std::cout<<"\n"<<compositionalLookupNames[largestCompIndex]<<" "<<currP<<"  "<<currT<<" "<<meltFraction;
                 }
                 else
                 {
                     meltFraction=0.0;
                 }
 
+
+
+
+
+                // std::cout<<"inside melt_fraction"<<"\n";
+                // for (int i = 0; i < 2; i++) 
+                // {
+                //     for (size_t j = 0; j < mantle_data[i].size(); j++) 
+                //     {
+                //         std::cout << mantle_data[i][j] << " ";
+                //     }
+                //     std::cout << "\n";
+                // }
+
+                // reqd_index=0;
+                // // double calcPressure=3000*9.8*currDepth;
+                // // currP=calcPressure;
+                // if ((currDepth>=5e3) && (currDepth<80e3))
+                // {
+                //     if(currP<0)
+                //     {
+                //     currP=0;
+                //     }
+
+                //     // Magemin file in kbar and Kelvin
+                //     float check_min_T=abs(mantle_data[0][1]-currT);
+                //     float check_min_P=abs(mantle_data[0][0]*1e8-currP);
+
+                //     if((currT<=mantle_max_T+20) && (currT>=mantle_min_T-20) && (currP>=mantle_min_P) && (currP<=mantle_max_P))
+                //     {    
+                //         int checkFound=999;
+                //         for(size_t i=0;i<mantle_data.size();i++)
+                //         {
+                //             if((check_min_T>=abs(mantle_data[i][1]-currT)) && (check_min_P>=abs(mantle_data[i][0]*1e+8-currP)))
+                //             {
+                //                 check_min_T=abs(mantle_data[i][1]-currT);
+                //                 check_min_P=abs(mantle_data[i][0]*1e+8-currP);
+                //                 reqd_index=i;
+                //                 checkFound=0;
+                //             }
+                //         }
+                        
+                //         if(checkFound==0)
+                //         {
+                //             meltFraction=mantle_data[reqd_index][2]; //+ mantle_data[reqd_index][3];
+                //         }
+                //         else
+                //         {
+                //             meltFraction=0.0;
+                //         }
+                        
+                //     }
+                //     else
+                //     {
+                //         meltFraction=0.0;
+                //     }
+
+                //     // melt_fractions[q]=melt_fraction;
+                // }
+                // else
+                // {
+                //     meltFraction=0.0;
+                // }
+
                 return meltFraction;
             }
 
 
-            template <int dim>
-            void
-            mageminLookup<dim>::
-            calculate_fluid_outputs(const typename Interface<dim>::MaterialModelInputs &in,
-                                    typename Interface<dim>::MaterialModelOutputs &out,
-                                    const double reference_T) const
-            {
-                MeltOutputs<dim> *melt_out = out.template get_additional_output<MeltOutputs<dim>>();
-                if (melt_out != nullptr)
-                {
-                    for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
-                    {
-                        const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
-                        double porosity = std::max(in.composition[i][porosity_idx],0.0);
+            // template <int dim>
+            // void
+            // mageminLookup<dim>::
+            // calculate_fluid_outputs(const typename Interface<dim>::MaterialModelInputs &in,
+            //                         typename Interface<dim>::MaterialModelOutputs &out,
+            //                         const double reference_T) const
+            // {
+            //     MeltOutputs<dim> *melt_out = out.template get_additional_output<MeltOutputs<dim>>();
+            //     if (melt_out != nullptr)
+            //     {
+            //         for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
+            //         {
+            //             const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
+            //             double porosity = std::max(in.composition[i][porosity_idx],0.0);
 
-                        melt_out->fluid_viscosities[i] = viscosity_fluid;
-                        melt_out->permeabilities[i] = reference_permeability * Utilities::fixed_power<3>(porosity) * Utilities::fixed_power<2>(1.0-porosity);
+            //             melt_out->fluid_viscosities[i] = viscosity_fluid;
+            //             melt_out->permeabilities[i] = reference_permeability * Utilities::fixed_power<3>(porosity) * Utilities::fixed_power<2>(1.0-porosity);
 
 
-                        /// need to find nearest element for density
+            //             /// need to find nearest element for density
 
-                        // Calculate dependence of fluid density on temperature if adiabatic heating in switched on
-                        // first, calculate temperature dependence of density
-                        double temperature_dependence = 1.0;
-                        if (this->include_adiabatic_heating ())
-                        {
-                            // temperature dependence is 1 - alpha * (T - T(adiabatic))
-                            temperature_dependence -= (in.temperature[i] - this->get_adiabatic_conditions().temperature(in.position[i]))
-                                                    * out.thermal_expansion_coefficients[i];
-                        }
-                        else
-                        temperature_dependence -= (in.temperature[i] - reference_T) * out.thermal_expansion_coefficients[i];
+            //             // Calculate dependence of fluid density on temperature if adiabatic heating in switched on
+            //             // first, calculate temperature dependence of density
+            //             double temperature_dependence = 1.0;
+            //             if (this->include_adiabatic_heating ())
+            //             {
+            //                 // temperature dependence is 1 - alpha * (T - T(adiabatic))
+            //                 temperature_dependence -= (in.temperature[i] - this->get_adiabatic_conditions().temperature(in.position[i]))
+            //                                         * out.thermal_expansion_coefficients[i];
+            //             }
+            //             else
+            //             temperature_dependence -= (in.temperature[i] - reference_T) * out.thermal_expansion_coefficients[i];
 
-                         // the fluid compressibility includes two parts, a constant compressibility, and a pressure-dependent one
-                        // this is a simplified formulation, experimental data are often fit to the Birch-Murnaghan equation of state
-                        const double fluid_compressibility = melt_compressibility / (1.0 + in.pressure[i] * melt_bulk_modulus_derivative * melt_compressibility);
+            //              // the fluid compressibility includes two parts, a constant compressibility, and a pressure-dependent one
+            //             // this is a simplified formulation, experimental data are often fit to the Birch-Murnaghan equation of state
+            //             const double fluid_compressibility = melt_compressibility / (1.0 + in.pressure[i] * melt_bulk_modulus_derivative * melt_compressibility);
 
-                        melt_out->fluid_densities[i] = reference_rho_fluid * std::exp(fluid_compressibility * (in.pressure[i] - this->get_surface_pressure()))
-                                                    * temperature_dependence;
+            //             melt_out->fluid_densities[i] = reference_rho_fluid * std::exp(fluid_compressibility * (in.pressure[i] - this->get_surface_pressure()))
+            //                                         * temperature_dependence;
 
-                        melt_out->fluid_density_gradients[i] = melt_out->fluid_densities[i] * melt_out->fluid_densities[i]
-                                                            * fluid_compressibility
-                                                            * this->get_gravity_model().gravity_vector(in.position[i]);
+            //             melt_out->fluid_density_gradients[i] = melt_out->fluid_densities[i] * melt_out->fluid_densities[i]
+            //                                                 * fluid_compressibility
+            //                                                 * this->get_gravity_model().gravity_vector(in.position[i]);
                         
                        
 
@@ -307,72 +374,72 @@ namespace aspect
 
 
 
-                        double visc_temperature_dependence = 1.0;
-                        if (this->include_adiabatic_heating ())
-                        {
-                            const double delta_temp = in.temperature[i]-this->get_adiabatic_conditions().temperature(in.position[i]);
-                            visc_temperature_dependence = std::max(std::min(std::exp(-thermal_bulk_viscosity_exponent*delta_temp/this->get_adiabatic_conditions().temperature(in.position[i])),1e4),1e-4);
-                        }
-                        else
-                        {
-                            const double delta_temp = in.temperature[i]-reference_T;
-                            const double T_dependence = (thermal_bulk_viscosity_exponent == 0.0 ? 0.0:thermal_bulk_viscosity_exponent*delta_temp/reference_T);
-                            visc_temperature_dependence = std::max(std::min(std::exp(-T_dependence),1e4),1e-4);
-                        }
-                        melt_out->compaction_viscosities[i] *= visc_temperature_dependence;
-                    }
-                }
+            //             double visc_temperature_dependence = 1.0;
+            //             if (this->include_adiabatic_heating ())
+            //             {
+            //                 const double delta_temp = in.temperature[i]-this->get_adiabatic_conditions().temperature(in.position[i]);
+            //                 visc_temperature_dependence = std::max(std::min(std::exp(-thermal_bulk_viscosity_exponent*delta_temp/this->get_adiabatic_conditions().temperature(in.position[i])),1e4),1e-4);
+            //             }
+            //             else
+            //             {
+            //                 const double delta_temp = in.temperature[i]-reference_T;
+            //                 const double T_dependence = (thermal_bulk_viscosity_exponent == 0.0 ? 0.0:thermal_bulk_viscosity_exponent*delta_temp/reference_T);
+            //                 visc_temperature_dependence = std::max(std::min(std::exp(-T_dependence),1e4),1e-4);
+            //             }
+            //             melt_out->compaction_viscosities[i] *= visc_temperature_dependence;
+            //         }
+            //     }
 
 
 
-                if (this->include_melt_transport() && in.requests_property(MaterialProperties::viscosity))
-                {
-                    for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
-                    {
-                        const double porosity = std::min(1.0, std::max(in.composition[i][porosity_idx],0.0));
-                        out.viscosities[i] *= std::exp(- alpha_phi * porosity);
-                    }
-                }
-            }
+            //     if (this->include_melt_transport() && in.requests_property(MaterialProperties::viscosity))
+            //     {
+            //         for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
+            //         {
+            //             const double porosity = std::min(1.0, std::max(in.composition[i][porosity_idx],0.0));
+            //             out.viscosities[i] *= std::exp(- alpha_phi * porosity);
+            //         }
+            //     }
+            // }
 
 
-            /**
-             * Function to modify material properties based on minimization using MAGEMin
-             */
-            template <int dim>
-            void
-            mageminLookup<dim>::
-            calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
-                                            typename Interface<dim>::MaterialModelOutputs &out) const
-            {
-                ReactionRateOutputs<dim> *reaction_rate_out = out.template get_additional_output<ReactionRateOutputs<dim>>();
+            // /**
+            //  * Function to modify material properties based on minimization using MAGEMin
+            //  */
+            // template <int dim>
+            // void
+            // mageminLookup<dim>::
+            // calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
+            //                                 typename Interface<dim>::MaterialModelOutputs &out) const
+            // {
+            //     ReactionRateOutputs<dim> *reaction_rate_out = out.template get_additional_output<ReactionRateOutputs<dim>>();
 
-                // Fill reaction rate outputs if the model uses operator splitting.
-                // Specifically, change the porosity (representing the amount of free fluid)
-                // based on the water solubility and the fluid content.
-                if (this->get_parameters().use_operator_splitting && reaction_rate_out != nullptr)
-                    {
-                    std::vector<double> eq_free_fluid_fractions(out.n_evaluation_points());
-                    melt_fractions(in, eq_free_fluid_fractions);
+            //     // Fill reaction rate outputs if the model uses operator splitting.
+            //     // Specifically, change the porosity (representing the amount of free fluid)
+            //     // based on the water solubility and the fluid content.
+            //     if (this->get_parameters().use_operator_splitting && reaction_rate_out != nullptr)
+            //         {
+            //         std::vector<double> eq_free_fluid_fractions(out.n_evaluation_points());
+            //         melt_fractions(in, eq_free_fluid_fractions);
 
-                    for (unsigned int q=0; q<out.n_evaluation_points(); ++q)
-                        for (unsigned int c=0; c<in.composition[q].size(); ++c)
-                        {
-                            double porosity_change = eq_free_fluid_fractions[q] - in.composition[q][porosity_idx];
-                            // do not allow negative porosity
-                            if (in.composition[q][porosity_idx] + porosity_change < 0)
-                            porosity_change = -in.composition[q][porosity_idx];
+            //         for (unsigned int q=0; q<out.n_evaluation_points(); ++q)
+            //             for (unsigned int c=0; c<in.composition[q].size(); ++c)
+            //             {
+            //                 double porosity_change = eq_free_fluid_fractions[q] - in.composition[q][porosity_idx];
+            //                 // do not allow negative porosity
+            //                 if (in.composition[q][porosity_idx] + porosity_change < 0)
+            //                 porosity_change = -in.composition[q][porosity_idx];
 
-                            const unsigned int bound_fluid_idx = this->introspection().compositional_index_for_name("bound_fluid");
-                            if (c == bound_fluid_idx && this->get_timestep_number() > 0)
-                            reaction_rate_out->reaction_rates[q][c] = - porosity_change / fluid_reaction_time_scale;
-                            else if (c == porosity_idx && this->get_timestep_number() > 0)
-                            reaction_rate_out->reaction_rates[q][c] = porosity_change / fluid_reaction_time_scale;
-                            else
-                            reaction_rate_out->reaction_rates[q][c] = 0.0;
-                        }
-                    }
-            }
+            //                 const unsigned int bound_fluid_idx = this->introspection().compositional_index_for_name("bound_fluid");
+            //                 if (c == bound_fluid_idx && this->get_timestep_number() > 0)
+            //                 reaction_rate_out->reaction_rates[q][c] = - porosity_change / fluid_reaction_time_scale;
+            //                 else if (c == porosity_idx && this->get_timestep_number() > 0)
+            //                 reaction_rate_out->reaction_rates[q][c] = porosity_change / fluid_reaction_time_scale;
+            //                 else
+            //                 reaction_rate_out->reaction_rates[q][c] = 0.0;
+            //             }
+            //         }
+            // }
 
 
             template <int dim>
@@ -525,6 +592,11 @@ namespace aspect
                                 Patterns::Double(),
                                 "Reference permeability of the solid host rock."
                                 "Units: \\si{\\meter\\squared}.");
+                prm.declare_entry ("Cutoff depth for magemin", "300e3",
+                                Patterns::Double(),
+                                "Cutoff depth: Melting will only be considered above this depth"
+                                "Units: \\si{\\meter}.");
+                  
             }
 
             template <int dim>
@@ -543,14 +615,19 @@ namespace aspect
                 mantle_max_T=prm.get_double ("Mantle Maximum Temperature");
 
 
-                // Read my models Names
-                data_directory_magemin                  = Utilities::expand_ASPECT_SOURCE_DIR(prm.get ("Data directory Lookup Table Magemin"));
+                
                 mantle_data_file_name      = "arranged_output_mantle.dat";
-                // crust_data_file_name     = prm.get ("Crust data file name");
+                crust_data_file_name     = "arranged_output_crust.dat";
                 
 
-                compositionalLookupNames = Utilities::split_string_list(prm.get("Composition names"), ',');
-                compositionalLookupFileNames = Utilities::split_string_list(prm.get("File names for compositions"), ',');
+                
+                // Read my models Names
+                data_directory_magemin                  = Utilities::expand_ASPECT_SOURCE_DIR(prm.get ("Data directory Lookup Table Magemin"));
+
+                compositionalLookupNames = {"c1","c2"};
+                // Utilities::split_string_list(prm.get("Composition names"), ',');
+                compositionalLookupFileNames = {"c1.dat", "c2.dat"};
+                // Utilities::split_string_list(prm.get("File names for compositions"), ',');
                 
 
 
@@ -567,6 +644,7 @@ namespace aspect
                 melt_bulk_modulus_derivative = prm.get_double ("Melt bulk modulus derivative");
                 depletion_solidus_change   = prm.get_double ("Depletion solidus change");
                 reference_permeability     = prm.get_double ("Reference permeability");
+                cutOff_depth                =   prm.get_double ("Cutoff depth for magemin");
 
 
                 if (this->convert_output_to_years() == true)
