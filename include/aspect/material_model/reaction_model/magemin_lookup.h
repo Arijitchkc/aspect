@@ -94,12 +94,12 @@ namespace aspect
                 double
                 melt_fraction (const MaterialModel::MaterialModelInputs<dim> &in, unsigned int q) const;
 
-                // void calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
-                //                                 typename Interface<dim>::MaterialModelOutputs &out) const;
+                void calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
+                                                typename Interface<dim>::MaterialModelOutputs &out) const;
 
-                // void calculate_fluid_outputs(const typename Interface<dim>::MaterialModelInputs &in,
-                //                        typename Interface<dim>::MaterialModelOutputs &out,
-                                    //    const double reference_T) const;
+                void calculate_fluid_outputs(const typename Interface<dim>::MaterialModelInputs &in,
+                                       typename Interface<dim>::MaterialModelOutputs &out,
+                                       const double reference_T) const;
 
                 void 
                 initialize();
