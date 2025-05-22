@@ -207,12 +207,12 @@ namespace aspect
                   }
             }
         }
-      // else if(fluid_solid_reaction_scheme == magemin)
-      //   {
+      else if(fluid_solid_reaction_scheme == magemin)
+        {
           
-      //     mageM.calculate_reaction_rate_outputs(in, out);
-      //     mageM.calculate_fluid_outputs(in, out, reference_T);
-      //   }
+          mageM.calculate_reaction_rate_outputs(in, out);
+          mageM.calculate_fluid_outputs(in, out, reference_T);
+        }
       else if(fluid_solid_reaction_scheme == katz2003)
         {
           katz2003_model.calculate_reaction_rate_outputs(in, out);
@@ -440,13 +440,15 @@ namespace aspect
                       ExcMessage("Material model Reactive Fluid Transport only "
                                  "works if there is a compositional field called porosity."));
 
-          if (fluid_solid_reaction_scheme != katz2003 || fluid_solid_reaction_scheme != magemin)
+
+          if (fluid_solid_reaction_scheme != katz2003 && fluid_solid_reaction_scheme != magemin)
             {
               AssertThrow(this->introspection().compositional_name_exists("bound_fluid"),
                           ExcMessage("Material model Reactive Fluid Transport only "
                                      "works if there is a compositional field called bound_fluid."));
             }
-          else
+          
+          if (fluid_solid_reaction_scheme == katz2003)
             {
               AssertThrow(this->introspection().compositional_name_exists("peridotite"),
                           ExcMessage("Material model Katz 2003 Mantle Melting only "
@@ -461,7 +463,7 @@ namespace aspect
       if(fluid_solid_reaction_scheme == magemin)
       {
         std::cout<<"Initializing magemin FIle"<<std::endl;
-        mageM.initialize();
+        // mageM.initialize();
         mageM.initializeNewandModern();
       }
       

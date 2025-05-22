@@ -15,53 +15,53 @@ namespace aspect
     {
         namespace ReactionModel
         {
-            namespace internal
-            {
-                readLookUpTable::readLookUpTable(const std::string &filename, const MPI_Comm comm) 
-                {
+            // namespace internal
+            // {
+            //     readLookUpTable::readLookUpTable(const std::string &filename, const MPI_Comm comm) 
+            //     {
 
-                    // std::ifstream file(filename);
-                    std::string line;
+            //         // std::ifstream file(filename);
+            //         std::string line;
 
-                    // Read data from disk and distribute among processes
-                    std::istringstream file(Utilities::read_and_distribute_file_content(filename, comm));
+            //         // Read data from disk and distribute among processes
+            //         std::istringstream file(Utilities::read_and_distribute_file_content(filename, comm));
 
 
-                    if (!file) 
-                    {
-                        std::cerr << "Error: Unable to open file " << filename << "\n";
-                    }
+            //         if (!file) 
+            //         {
+            //             std::cerr << "Error: Unable to open file " << filename << "\n";
+            //         }
 
-                    while (std::getline(file, line)) 
-                    {
+            //         while (std::getline(file, line)) 
+            //         {
                         
-                        // Skip header lines
-                        if (line[0] == '#') continue;
+            //             // Skip header lines
+            //             if (line[0] == '#') continue;
                         
-                        std::stringstream ss(line);
-                        double value;
-                        std::vector<double> row;
+            //             std::stringstream ss(line);
+            //             double value;
+            //             std::vector<double> row;
                         
-                        while (ss >> value) 
-                        {
-                            row.push_back(value);
-                        }
+            //             while (ss >> value) 
+            //             {
+            //                 row.push_back(value);
+            //             }
 
-                        // std::cout<<row[0]<<" "<<row[1]<<" "<<row[2]<<" "<<row[10]<<std::endl;
-                        // Ensure there are enough columns before accessing indices
-                        if (row.size() >= 17) 
-                        {
-                            data_magemin.push_back({row[0],row[1],row[2],row[10]}); // 5th and 6th columns (zero-based index 4 and 5)
-                        }
-                    } 
-                    // file.close();
-                }
+            //             // std::cout<<row[0]<<" "<<row[1]<<" "<<row[2]<<" "<<row[10]<<std::endl;
+            //             // Ensure there are enough columns before accessing indices
+            //             if (row.size() >= 17) 
+            //             {
+            //                 data_magemin.push_back({row[0],row[1],row[2],row[10]}); // 5th and 6th columns (zero-based index 4 and 5)
+            //             }
+            //         } 
+            //         // file.close();
+            //     }
 
-                std::vector<std::vector<double>> readLookUpTable::getData() const
-                {
-                    return data_magemin;
-                }
-            }
+            //     std::vector<std::vector<double>> readLookUpTable::getData() const
+            //     {
+            //         return data_magemin;
+            //     }
+            // }
 
 
             namespace internal2
@@ -155,28 +155,28 @@ namespace aspect
 
 
 
-            template <int dim>
-            void
-            mageminLookup<dim>::initialize()
-            {
+            // template <int dim>
+            // void
+            // mageminLookup<dim>::initialize()
+            // {
 
-                crustLookupData = std::make_unique<internal::readLookUpTable>(data_directory_magemin+crust_data_file_name, this->get_mpi_communicator());
-                mantleLookupData = std::make_unique<internal::readLookUpTable>(data_directory_magemin+mantle_data_file_name, this->get_mpi_communicator());
+            //     crustLookupData = std::make_unique<internal::readLookUpTable>(data_directory_magemin+crust_data_file_name, this->get_mpi_communicator());
+            //     mantleLookupData = std::make_unique<internal::readLookUpTable>(data_directory_magemin+mantle_data_file_name, this->get_mpi_communicator());
  
-                mantle_data = mantleLookupData->getData(); 
-                crust_data = crustLookupData->getData();
+            //     mantle_data = mantleLookupData->getData(); 
+            //     crust_data = crustLookupData->getData();
 
-                // // Iterating using indexes
-                // std::cout<<"initialize"<<"\n";
-                // for (int i = 0; i < 2; i++) 
-                // {
-                //     for (size_t j = 0; j < mantle_data[i].size(); j++) 
-                //     {
-                //         std::cout << mantle_data[i][j] << " ";
-                //     }
-                //     std::cout << "\n";
-                // }
-            }
+            //     // // Iterating using indexes
+            //     // std::cout<<"initialize"<<"\n";
+            //     // for (int i = 0; i < 2; i++) 
+            //     // {
+            //     //     for (size_t j = 0; j < mantle_data[i].size(); j++) 
+            //     //     {
+            //     //         std::cout << mantle_data[i][j] << " ";
+            //     //     }
+            //     //     std::cout << "\n";
+            //     // }
+            // }
 
             template <int dim>
             int
@@ -184,8 +184,8 @@ namespace aspect
             get_closest_index(float T, float P, const std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles, int largestCompIndex) const
             {
                 int closestIndex = -1;
-                double minDiff = 999999999999;
-                std::cout<<"Checking if this works or not"<<magelookupFiles[largestCompIndex]->compositionName;
+                double minDiff = -999;
+                // std::cout<<"Checking if this works or not"<<magelookupFiles[largestCompIndex]->compositionName;
                 for (size_t i = 0; i < magelookupFiles[largestCompIndex]->Pressure.size(); ++i) 
                 {
                     double diff = std::abs(magelookupFiles[largestCompIndex]->Pressure[i] - P) + std::abs(magelookupFiles[largestCompIndex]->Temperature[i] - T);
@@ -196,7 +196,7 @@ namespace aspect
                     }
                 }
 
-                if(minDiff==999999999999)
+                if(minDiff==-999)
                 {
                     return -999;
                 }
@@ -222,34 +222,43 @@ namespace aspect
                 
                 // Put in a check for composition; This is where I call the function to calculate closest P and T conditions;
                 float compVal=0.0;
-                int largestCompIndex=0;
+                int largestCompIndex=-999;
                 int closestMaterialPropertiesIndex=0;
 
                 if(currDepth<cutOff_depth)
                 {
-                    //Loop through all the composition to find the maximum composition
+                    //Loop through all the compositions(which have a corresponding lookup table) to find the maximum composition (Only accept if the value is more than 0.5)
                     for(size_t comp=0;comp<compositionalLookupNames.size();comp++)
                     {
                         const unsigned int comp_idx = this->introspection().compositional_index_for_name(compositionalLookupNames[comp]);
-                        if(in.composition[q][comp_idx]>compVal)
+                        if(in.composition[q][comp_idx]>compVal && in.composition[q][comp_idx]>0.4)
                         {
-                            std::cout<<"\n"<<in.composition[q][comp_idx]<<"\n"<<compositionalLookupNames[comp];
+                            // std::cout<<"\n"<<in.composition[q][comp_idx]<<"\n"<<compositionalLookupNames[comp];
                             largestCompIndex=comp;
                             compVal=in.composition[q][comp_idx];
                         }
                     }
                     
-                    closestMaterialPropertiesIndex=get_closest_index(currT, currP, magelookupFiles, largestCompIndex);
+                    
 
-                    if(closestMaterialPropertiesIndex==-999)
+                    if(largestCompIndex==-999)
                     {
                         meltFraction=0.0;
                     }
                     else
                     {
-                        meltFraction=magelookupFiles[largestCompIndex]->materialProperties[closestMaterialPropertiesIndex][0];
+
+                        closestMaterialPropertiesIndex=get_closest_index(currT, currP, magelookupFiles, largestCompIndex);
+                        if(closestMaterialPropertiesIndex==-999)
+                        {
+                            meltFraction=0.0;
+                        }
+                        else
+                        {
+                            meltFraction=magelookupFiles[largestCompIndex]->materialProperties[closestMaterialPropertiesIndex][0];
+                        }
                     }
-                    std::cout<<"\n"<<compositionalLookupNames[largestCompIndex]<<" "<<currP<<"  "<<currT<<" "<<meltFraction;
+                    // std::cout<<"\n"<<compositionalLookupNames[largestCompIndex]<<" "<<currP<<"  "<<currT<<" "<<meltFraction;
                 }
                 else
                 {
@@ -269,16 +278,16 @@ namespace aspect
                                     const double reference_T) const
             {
                 MeltOutputs<dim> *melt_out = out.template get_additional_output<MeltOutputs<dim>>();
+                const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
+
                 if (melt_out != nullptr)
                 {
                     for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
                     {
-                        const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
                         double porosity = std::max(in.composition[i][porosity_idx],0.0);
 
                         melt_out->fluid_viscosities[i] = viscosity_fluid;
                         melt_out->permeabilities[i] = reference_permeability * Utilities::fixed_power<3>(porosity) * Utilities::fixed_power<2>(1.0-porosity);
-
 
                         /// need to find nearest element for density
 
@@ -349,6 +358,7 @@ namespace aspect
                                             typename Interface<dim>::MaterialModelOutputs &out) const
             {
                 ReactionRateOutputs<dim> *reaction_rate_out = out.template get_additional_output<ReactionRateOutputs<dim>>();
+                const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
 
                 // Fill reaction rate outputs if the model uses operator splitting.
                 // Specifically, change the porosity (representing the amount of free fluid)
@@ -356,7 +366,7 @@ namespace aspect
                 if (this->get_parameters().use_operator_splitting && reaction_rate_out != nullptr)
                     {
                     std::vector<double> eq_free_fluid_fractions(out.n_evaluation_points());
-                    melt_fractions(in, eq_free_fluid_fractions);
+                    // melt_fraction(in, eq_free_fluid_fractions);
 
                     for (unsigned int q=0; q<out.n_evaluation_points(); ++q)
                         for (unsigned int c=0; c<in.composition[q].size(); ++c)
@@ -366,11 +376,9 @@ namespace aspect
                             if (in.composition[q][porosity_idx] + porosity_change < 0)
                             porosity_change = -in.composition[q][porosity_idx];
 
-                            const unsigned int bound_fluid_idx = this->introspection().compositional_index_for_name("bound_fluid");
-                            if (c == bound_fluid_idx && this->get_timestep_number() > 0)
-                                reaction_rate_out->reaction_rates[q][c] = - porosity_change / fluid_reaction_time_scale;
-                            else if (c == porosity_idx && this->get_timestep_number() > 0)
-                                reaction_rate_out->reaction_rates[q][c] = porosity_change / fluid_reaction_time_scale;
+                            
+                            if (c == porosity_idx && this->get_timestep_number() > 0)
+                                reaction_rate_out->reaction_rates[q][c] = porosity_change / melting_time_scale;
                             else
                                 reaction_rate_out->reaction_rates[q][c] = 0.0;
                         }
@@ -382,35 +390,6 @@ namespace aspect
             void
             mageminLookup<dim>::declare_parameters (ParameterHandler &prm)
             {
-
-
-                prm.declare_entry ("Crust Minimum Pressure", "1e8",
-                            Patterns::Double (0.),
-                            "Crust Minimum Pressure. Units: \\si{\\Pa}.");
-                prm.declare_entry ("Crust Maximum Pressure", "0.2e9",
-                                    Patterns::Double (0.),
-                                    "Crust Maximum Pressure. Units: \\si{\\Pa}.");
-                prm.declare_entry ("Crust Minimum Temperature", "973.",
-                                    Patterns::Double (0.),
-                                    "Crust Minimum Temperature. Units: \\si{\\kelvin}.");
-                prm.declare_entry ("Crust Maximum Temperature", "1273.",
-                                    Patterns::Double (0.),
-                                    "Crust Maximum Tempetrature. Units: \\si{\\kelvin}.");
-                        
-
-                prm.declare_entry ("Mantle Minimum Pressure", "1e8",
-                                    Patterns::Double (0.),
-                                    "Mantle Minimum Pressure. Units: \\si{\\Pa}.");
-                prm.declare_entry ("Mantle Maximum Pressure", "2.0e9",
-                                    Patterns::Double (0.),
-                                    "Mantle Maximum Pressure. Units: \\si{\\Pa}.");
-                prm.declare_entry ("Mantle Minimum Temperature", "1000",
-                                    Patterns::Double (0.),
-                                    "Mantle Minimum Temperature. Units: \\si{\\kelvin}.");
-                prm.declare_entry ("Mantle Maximum Temperature", "1673.",
-                                    Patterns::Double (0.),
-                                    "Mantle Maximum Tempetrature. Units: \\si{\\kelvin}.");
-
 
                 prm.declare_entry ("Data directory Lookup Table Magemin", "$ASPECT_SOURCE_DIR/data/material-model/",
                             Patterns::DirectoryName (),
@@ -539,31 +518,14 @@ namespace aspect
             void
             mageminLookup<dim>::parse_parameters (ParameterHandler &prm)
             {
-                // New Parameters 
-                crust_min_P=prm.get_double ("Crust Minimum Pressure");
-                crust_max_P=prm.get_double ("Crust Maximum Pressure");
-                crust_min_T=prm.get_double ("Crust Minimum Temperature");
-                crust_max_T=prm.get_double ("Crust Maximum Temperature");
-
-                mantle_min_P=prm.get_double ("Mantle Minimum Pressure");
-                mantle_max_P=prm.get_double ("Mantle Maximum Pressure");
-                mantle_min_T=prm.get_double ("Mantle Minimum Temperature");
-                mantle_max_T=prm.get_double ("Mantle Maximum Temperature");
-
-
-                
-                mantle_data_file_name      = "arranged_output_mantle.dat";
-                crust_data_file_name     = "arranged_output_crust.dat";
-                
-
-                
+   
                 // Read my models Names
                 data_directory_magemin                  = Utilities::expand_ASPECT_SOURCE_DIR(prm.get ("Data directory Lookup Table Magemin"));
 
-                compositionalLookupNames = {"c1","c2"};
-                // Utilities::split_string_list(prm.get("Composition names"), ',');
-                compositionalLookupFileNames = {"c1.dat", "c2.dat"};
-                // Utilities::split_string_list(prm.get("File names for compositions"), ',');
+                // compositionalLookupNames = {"c1","c2"};
+                compositionalLookupNames=Utilities::split_string_list(prm.get("Composition names"), ',');
+                // compositionalLookupFileNames = {"c1.dat", "c2.dat"};
+                compositionalLookupFileNames=Utilities::split_string_list(prm.get("File names for compositions"), ',');
                 
 
 
