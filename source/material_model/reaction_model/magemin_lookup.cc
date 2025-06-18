@@ -269,6 +269,128 @@ namespace aspect
             }
 
 
+            /**
+             * Function to modify material properties based on minimization using MAGEMin
+             */
+            template <int dim>
+            void
+            mageminLookup<dim>::
+            calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
+                                            typename Interface<dim>::MaterialModelOutputs &out) const
+            {
+                ReactionRateOutputs<dim> *reaction_rate_out = out.template get_additional_output<ReactionRateOutputs<dim>>();
+
+                for (unsigned int i=0; i<in.n_evaluation_points();++i)
+                {
+                    if(this->include_melt_transport())
+                    {
+                        const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
+                        const unsigned int peridotite_idx = this->introspection().compositional_index_for_name("peridotite");
+
+                        const double old_porosity= in.composition[i][porosity_idx];
+                        const double maximum_melt_fraction=in.composition[i][peridotite_idx];                       
+
+                        double porosity_change = 0.0;
+
+
+                        if(fractional_melting)
+                        {
+                            const double eq_melt_fraction = melt_fraction(in,i);
+                            porosity_change = eq_melt_fraction - old_porosity;
+                        }
+                        else
+                        {
+                            porosity_change = melt_fraction(in,i) - std::max(maximum_melt_fraction, 0.0);
+                            porosity_change = std::max(porosity_change, 0.0);
+
+                            const double eq_melt_fraction = melt_fraction(in,i);
+                            const double porosity_change_wrt_melt_fraction = std::min(eq_melt_fraction - old_porosity - porosity_change,0.0);
+
+
+                            // depletion reaches the equilibrium melt fraction:
+                            const double porosity_change_wrt_depletion = std::min((eq_melt_fraction - std::max(maximum_melt_fraction, 0.0))
+                                                                                * (1.0 - old_porosity) / (1.0 - maximum_melt_fraction),0.0);
+                            double freezing_amount = std::max(porosity_change_wrt_melt_fraction, porosity_change_wrt_depletion);
+
+                            if (eq_melt_fraction == 0.0)
+                                freezing_amount = - old_porosity;
+
+                            porosity_change += freezing_amount;
+
+                            if (porosity_change < 0 )
+                                porosity_change *= freezing_rate * melting_time_scale;
+                        }
+
+                        // do not allow negative porosity
+                        porosity_change = std::max(porosity_change, -old_porosity);
+
+                        // because depletion is a volume-based, and not a mass-based property that is advected,
+                        // additional scaling factors on the right hand side apply
+
+                        for (unsigned int c=0; c<in.composition[i].size(); ++c)
+                        {
+                            // fill reaction rate outputs
+                            if (reaction_rate_out != nullptr && in.requests_property(MaterialProperties::reaction_rates))
+                            {
+                                if (c == peridotite_idx && this->get_timestep_number() > 0)
+                                {
+                                    reaction_rate_out->reaction_rates[i][c] = porosity_change / melting_time_scale * (1 - maximum_melt_fraction) / (1 - old_porosity);
+                                }
+                                else if (c == porosity_idx && this->get_timestep_number() > 0)
+                                {
+                                    reaction_rate_out->reaction_rates[i][c] = porosity_change / melting_time_scale;
+                                }
+                                else
+                                {
+                                    reaction_rate_out->reaction_rates[i][c] = 0.0;
+                                }
+                            }
+                        }
+                        // out.entropy_derivative_pressure[i]    = entropy_change (in.temperature[i], this->get_adiabatic_conditions().pressure(in.position[i]), maximum_melt_fraction, NonlinearDependence::pressure);
+                        // out.entropy_derivative_temperature[i] = entropy_change (in.temperature[i], this->get_adiabatic_conditions().pressure(in.position[i]), maximum_melt_fraction, NonlinearDependence::temperature);
+                    }
+                    else
+                    {
+                        // out.entropy_derivative_pressure[i]    = entropy_change (in.temperature[i], this->get_adiabatic_conditions().pressure(in.position[i]), 0, NonlinearDependence::pressure);
+                        // out.entropy_derivative_temperature[i] = entropy_change (in.temperature[i], this->get_adiabatic_conditions().pressure(in.position[i]), 0, NonlinearDependence::temperature);
+
+                        // no melting/freezing is used in the model --> set all reactions to zero
+                        for (unsigned int c=0; c<in.composition[i].size(); ++c)
+                            if (reaction_rate_out != nullptr)
+                                reaction_rate_out->reaction_rates[i][c] = 0.0;
+                    }
+                }
+
+
+
+                const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
+
+                // Fill reaction rate outputs if the model uses operator splitting.
+                // Specifically, change the porosity (representing the amount of free fluid)
+                // based on the water solubility and the fluid content.
+                if (this->get_parameters().use_operator_splitting && reaction_rate_out != nullptr)
+                    {
+                    std::vector<double> eq_free_fluid_fractions(out.n_evaluation_points());
+                    // melt_fraction(in, eq_free_fluid_fractions);
+
+                    for (unsigned int q=0; q<out.n_evaluation_points(); ++q)
+                        for (unsigned int c=0; c<in.composition[q].size(); ++c)
+                        {
+                            double porosity_change = eq_free_fluid_fractions[q] - in.composition[q][porosity_idx];
+                            // do not allow negative porosity
+                            if (in.composition[q][porosity_idx] + porosity_change < 0)
+                            porosity_change = -in.composition[q][porosity_idx];
+
+                            
+                            if (c == porosity_idx && this->get_timestep_number() > 0)
+                                reaction_rate_out->reaction_rates[q][c] = porosity_change / melting_time_scale;
+                            else
+                                reaction_rate_out->reaction_rates[q][c] = 0.0;
+                        }
+                    }
+            }
+
+
 
             template <int dim>
             void
@@ -345,44 +467,6 @@ namespace aspect
                         out.viscosities[i] *= std::exp(- alpha_phi * porosity);
                     }
                 }
-            }
-
-
-            /**
-             * Function to modify material properties based on minimization using MAGEMin
-             */
-            template <int dim>
-            void
-            mageminLookup<dim>::
-            calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
-                                            typename Interface<dim>::MaterialModelOutputs &out) const
-            {
-                ReactionRateOutputs<dim> *reaction_rate_out = out.template get_additional_output<ReactionRateOutputs<dim>>();
-                const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
-
-                // Fill reaction rate outputs if the model uses operator splitting.
-                // Specifically, change the porosity (representing the amount of free fluid)
-                // based on the water solubility and the fluid content.
-                if (this->get_parameters().use_operator_splitting && reaction_rate_out != nullptr)
-                    {
-                    std::vector<double> eq_free_fluid_fractions(out.n_evaluation_points());
-                    // melt_fraction(in, eq_free_fluid_fractions);
-
-                    for (unsigned int q=0; q<out.n_evaluation_points(); ++q)
-                        for (unsigned int c=0; c<in.composition[q].size(); ++c)
-                        {
-                            double porosity_change = eq_free_fluid_fractions[q] - in.composition[q][porosity_idx];
-                            // do not allow negative porosity
-                            if (in.composition[q][porosity_idx] + porosity_change < 0)
-                            porosity_change = -in.composition[q][porosity_idx];
-
-                            
-                            if (c == porosity_idx && this->get_timestep_number() > 0)
-                                reaction_rate_out->reaction_rates[q][c] = porosity_change / melting_time_scale;
-                            else
-                                reaction_rate_out->reaction_rates[q][c] = 0.0;
-                        }
-                    }
             }
 
 

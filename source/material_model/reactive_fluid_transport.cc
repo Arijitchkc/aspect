@@ -136,7 +136,7 @@ namespace aspect
     {
       base_model->evaluate(in,out);
 
-      if (fluid_solid_reaction_scheme != katz2003) // || fluid_solid_reaction_scheme != magemin)
+      if (fluid_solid_reaction_scheme != katz2003 && fluid_solid_reaction_scheme != magemin)
         {
           const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
 
