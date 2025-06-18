@@ -1,0 +1,6 @@
+2018-06-19: Automatic header creation implemented for use with Perple_X 6.8.3+ (Bob Myhill)
+2018-03-15: Changes in parameters to accomodate changes in Perple_X 6.8.1 (Julien Cornet)
+2018-03-15: Change in common block cxt15: K19 replaced k5 in the declaration (Julien Cornet)
+2016-10-24: Changes in parameters according to changes in Perple_X 6.7.4 (Julien Cornet)
+2013-06-11: Changes to parameters and common block definitions to accommodate changes in PerpleX 6.6.8.
+2012-03-23: Changed p_k21 from 500000 to 1000000, according to changes in Perple_X on 2012-03-07.

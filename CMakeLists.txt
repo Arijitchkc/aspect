@@ -952,6 +952,25 @@ else()
 endif()
 
 
+# Include MAGEMIN
+set(ASPECT_WITH_MAGEMin ON CACHE BOOL "Whether the user wants to compile ASPECT with MAGEMin or not.")
+message(STATUS "Using ASEPCT_WITH_MAGEMin = ${ASPECT_WITH_MAGEMin}")
+if(ASPECT_WITH_MAGEMin)
+  message(STATUS "Using contrib folder version.")
+  set(MAGEMin_SOURCE_DIR "${CMAKE_SOURCE_DIR}/contrib/MAGEMin/" CACHE PATH "" FORCE)
+  add_subdirectory(${MAGEMin_SOURCE_DIR})
+
+  if(${ASPECT_BUILD_DEBUG} STREQUAL "ON")
+    target_include_directories(${TARGET_EXE_DEBUG} PUBLIC ${MAGEMin_SOURCE_DIR}/src/ ${MAGEMin_SOURCE_DIR}/src/SB_database/ ${MAGEMin_SOURCE_DIR}/src/TC_database/)
+    target_link_libraries(${TARGET_EXE_DEBUG} MAGEMin_cpp) 
+  endif()
+  
+  if(${ASPECT_BUILD_RELEASE} STREQUAL "ON")
+    target_include_directories(${TARGET_EXE_RELEASE} PUBLIC ${MAGEMin_SOURCE_DIR}/src/ ${MAGEMin_SOURCE_DIR}/src/SB_database/ ${MAGEMin_SOURCE_DIR}/src/TC_database/)
+    target_link_libraries(${TARGET_EXE_RELEASE} MAGEMin_cpp) 
+  endif()
+endif()
+
 #
 ## installation
 #
