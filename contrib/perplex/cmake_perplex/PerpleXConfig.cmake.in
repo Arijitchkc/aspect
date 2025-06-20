@@ -1,0 +1,6 @@
+set(PERPLEX_VERSION "@VERSION@")
+
+@PACKAGE_INIT@
+
+set_and_check(PerpleX_INCLUDE_DIR "@INCLUDE_INSTALL_DIR@")
+set_and_check(PerpleX_LIBRARIES "@LIB_INSTALL_DIR@lib@SHARED_LIB@.so")

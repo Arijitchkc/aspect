@@ -18,20 +18,19 @@
   <http://www.gnu.org/licenses/>.
 */
 
-
-#include <aspect/material_model/reactive_fluid_transport.h>
 #include <aspect/adiabatic_conditions/interface.h>
+#include <aspect/material_model/reactive_fluid_transport.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/numerics/fe_field_function.h>
 
-namespace aspect
+namespace aspect 
 {
-  namespace MaterialModel
+  namespace MaterialModel 
   {
-    template <int dim>
-    bool
+    template <int dim> 
+    bool 
     ReactiveFluidTransport<dim>::
-    is_compressible () const
+    is_compressible() const 
     {
       return base_model->is_compressible();
     }
@@ -39,19 +38,19 @@ namespace aspect
 
 
     template <int dim>
-    double
+    double 
     ReactiveFluidTransport<dim>::
-    reference_darcy_coefficient () const
+    reference_darcy_coefficient() const 
     {
-      if (fluid_solid_reaction_scheme == katz2003)
-        {
-          return katz2003_model.reference_darcy_coefficient();
-        }
-      else
-        {
-          // 0.01 = 1% melt
-          return reference_permeability * Utilities::fixed_power<3>(0.01) / eta_f;
-        }
+      if (fluid_solid_reaction_scheme == katz2003) 
+      {
+        return katz2003_model.reference_darcy_coefficient();
+      } 
+      else 
+      {
+        // 0.01 = 1% melt
+        return reference_permeability * Utilities::fixed_power<3>(0.01) / eta_f;
+      }
     }
 
 
@@ -496,17 +495,15 @@ namespace aspect
 }
 
 // explicit instantiations
-namespace aspect
-{
-  namespace MaterialModel
-  {
-    ASPECT_REGISTER_MATERIAL_MODEL(ReactiveFluidTransport,
-                                   "reactive fluid transport",
-                                   "Material model that is designed to advect fluids and compute "
-                                   "fluid release and absorption based on different models for "
-                                   "fluid-rock interaction. At present, models where no fluid-rock "
-                                   "interactions occur or the solid has zero solubility are available. "
-                                   "The properties of the solid can be taken from another material model "
-                                   "that is used as a base model.")
-  }
+namespace aspect {
+namespace MaterialModel {
+ASPECT_REGISTER_MATERIAL_MODEL(
+    ReactiveFluidTransport, "reactive fluid transport",
+    "Material model that is designed to advect fluids and compute "
+    "fluid release and absorption based on different models for "
+    "fluid-rock interaction. At present, models where no fluid-rock "
+    "interactions occur or the solid has zero solubility are available. "
+    "The properties of the solid can be taken from another material model "
+    "that is used as a base model.")
 }
+} // namespace aspect
