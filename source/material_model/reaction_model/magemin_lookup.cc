@@ -2,11 +2,15 @@
  * Initial implementation of magemin using a lookup table
  */
 
+#include "aspect/material_model/interface.h"
+#include "aspect/material_model/reactive_fluid_transport.h"
 #include <aspect/adiabatic_conditions/interface.h>
 #include <aspect/gravity_model/interface.h>
 #include <aspect/material_model/reaction_model/magemin_lookup.h>
 #include <aspect/utilities.h>
 #include <deal.II/base/parameter_handler.h>
+#include <deal.II/fe/fe_data.h>
+#include <type_traits>
 
 namespace aspect {
 namespace MaterialModel {
@@ -192,62 +196,205 @@ int mageminLookup<dim>::get_closest_index(
   return closestIndex;
 }
 
+// template <int dim>
+// bool mageminLookup<int dim>::guess_MeltFraction(double Pressure) {}
+
+template <int dim>
+bool mageminLookup<dim>::guess_MeltFraction(double pressure,
+                                            double temperature) const {
+  double T_solidus = A1 + 273.15 + A2 * pressure + A3 * pressure * pressure;
+  if (temperature > (T_solidus - 100)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+template <int dim>
+double mageminLookup<dim>::melt_fractionMAGEMin(
+    const typename Interface<dim>::MaterialModelInputs &in,
+    typename Interface<dim>::MaterialModelOutputs &out, unsigned int q) const {
+  double meltFraction = 0.0;
+
+  // Calculate Pressure and Temperature for the index
+
+  float currP =
+      this->get_adiabatic_surface_temperature().pressure(in.position[q]);
+  const float currT = in.temperature[q];
+
+  // Convert variables into MAGEMin units;
+  float currT_Celcius = currT - 273;
+  float currP_kbar = currP / 1e8;
+
+  if (guess_MeltFraction(currP, currT)) {
+    // some variables which need to be changed later;
+    int len_oxides = 11;
+    char *database = "ig";
+    // Make datastructure object for stableAssemblage
+    stableAssemblage sAssemblage;
+    sAssemblage.oxideNames = {"SiO2", "Al2O3", "CaO", "MgO",   "FeOt", "K2O",
+                              "Na2O", "TiO2",  "O",   "Cr2O3", "H2O"};
+
+    sAssemblage.solutionNames = {"SYS", "spl", "bi", "cd",   "cpx",
+                                 "opx", "ep",  "g",  "amp",  "ilm",
+                                 "liq", "mu",  "ol", "pl3T", "fl"};
+
+    // get index for major_oxides
+    const unsigned int SiO2_idx =
+        this->introspection().compositional_index_for_name("SiO2");
+    const unsigned int Al2O3_idx =
+        this->introspection().compositional_index_for_name("Al2O3");
+    const unsigned int CaO_idx =
+        this->introspection().compositional_index_for_name("CaO");
+    const unsigned int MgO_idx =
+        this->introspection().compositional_index_for_name("MgO");
+    const unsigned int FeOt_idx =
+        this->introspection().compositional_index_for_name("FeOt");
+    const unsigned int K2O_idx =
+        this->introspection().compositional_index_for_name("K2O");
+    const unsigned int Na2O_idx =
+        this->introspection().compositional_index_for_name("Na2O");
+    const unsigned int TiO2_idx =
+        this->introspection().compositional_index_for_name("TiO2");
+    const unsigned int O_idx =
+        this->introspection().compositional_index_for_name("O");
+    const unsigned int Cr2O3_idx =
+        this->introspection().compositional_index_for_name("Cr2O3");
+    const unsigned int H2O_idx =
+        this->introspection().compositional_index_for_name("H2O");
+
+    std::vector<double> bulkComposition{
+        in.composition[q][SiO2_idx], in.composition[q][Al2O3_idx],
+        in.composition[q][CaO_idx],  in.composition[q][MgO_idx],
+        in.composition[q][FeOt_idx], in.composition[q][K2O_idx],
+        in.composition[q][Na2O_idx], in.composition[q][TiO2_idx],
+        in.composition[q][O_idx],    in.composition[q][Cr2O3_idx],
+        in.composition[q][H2O_idx]};
+
+    int dummyArg1;
+    char dummyArgc1;
+    wrap.executeMAGEMin(dummyArg1, dummyArgc1, currT_Celcius, currP_kbar,
+                        len_oxides, database, bulkComposition, &sAssemblage);
+    // Extract and update major oxides and meltiFraction
+    out.reaction_terms[q][SiO2_idx] =
+        (in.composition[q][SiO2_idx] - sAssemblage.oxideCompositions[0][0]);
+
+    out.reaction_terms[q][Al2O3_idx] =
+        (in.composition[q][Al2O3_idx] - sAssemblage.oxideCompositions[0][1]);
+    out.reaction_terms[q][CaO_idx] =
+        (in.composition[q][CaO_idx] - sAssemblage.oxideCompositions[0][2]);
+    out.reaction_terms[q][MgO_idx] =
+        (in.composition[q][MgO_idx] - sAssemblage.oxideCompositions[0][3]);
+    out.reaction_terms[q][FeOt_idx] =
+        (in.composition[q][FeOt_idx] - sAssemblage.oxideCompositions[0][4]);
+    out.reaction_terms[q][K2O_idx] =
+        (in.composition[q][K2O_idx] - sAssemblage.oxideCompositions[0][5]);
+    out.reaction_terms[q][Na2O_idx] =
+        (in.composition[q][Na2O_idx] - sAssemblage.oxideCompositions[0][6]);
+    out.reaction_terms[q][TiO2_idx] =
+        (in.composition[q][TiO2_idx] - sAssemblage.oxideCompositions[0][7]);
+    out.reaction_terms[q][O_idx] =
+        (in.composition[q][O_idx] - sAssemblage.oxideCompositions[0][8]);
+    out.reaction_terms[q][Cr2O3_idx] =
+        (in.composition[q][Cr2O3_idx] - sAssemblage.oxideCompositions[0][9]);
+    out.reaction_terms[q][H2O_idx] =
+        (in.composition[q][H2O_idx] - sAssemblage.oxideCompositions[0][10]);
+
+    meltFraction = sAssemblage.stablePhasesProperties[10][0];
+    return meltFraction;
+  } else {
+    meltFraction = 0.0;
+    return meltFraction;
+  }
+}
+
 template <int dim>
 double mageminLookup<dim>::melt_fraction(
-    const MaterialModel::MaterialModelInputs<dim> &in, unsigned int q) const {
+    const typename Interface<dim>::MaterialModelInputs &in,
+    unsigned int q) const {
   double meltFraction = 0.0;
 
   // const unsigned int bound_fluid_idx =
   // this->introspection().compositional_index_for_name("bound_fluid"); // Needs
   // to go
-
   float currP = this->get_adiabatic_conditions().pressure(in.position[q]);
   ; // this->get_adiabatic_conditions().pressure(in.position[q]);
   const float currT = in.temperature[q]; // in.temperature[q];
-  const float currDepth = this->get_geometry_model().depth(
-      in.position[q]); // this->get_geometry_model().depth(in.position[q]);
+  //
 
-  // Put in a check for composition; This is where I call the function to
-  // calculate closest P and T conditions;
-  float compVal = 0.0;
-  int largestCompIndex = -999;
-  int closestMaterialPropertiesIndex = 0;
+  if (guess_MeltFraction(currP, currT)) {
 
-  if (currDepth < cutOff_depth) {
-    // Loop through all the compositions(which have a corresponding lookup
-    // table) to find the maximum composition (Only accept if the value is more
-    // than 0.5)
-    for (size_t comp = 0; comp < compositionalLookupNames.size(); comp++) {
-      const unsigned int comp_idx =
-          this->introspection().compositional_index_for_name(
-              compositionalLookupNames[comp]);
-      if (in.composition[q][comp_idx] > compVal &&
-          in.composition[q][comp_idx] > 0.4) {
-        // std::cout<<"\n"<<in.composition[q][comp_idx]<<"\n"<<compositionalLookupNames[comp];
-        largestCompIndex = comp;
-        compVal = in.composition[q][comp_idx];
-      }
+#ifdef ASPECT_WITH_MAGEMin
+    // Test if the magemin functions are accessible
+    double TemperatureDummy = 1200 + 273; // in Kelvin
+    double PressureDummy = 32;            // in kbar
+    int len_oxides = 11;
+    char *database = "ig";
+    std::vector<double> bulkComposition{38.494, 1.776, 2.824, 50.566,
+                                        5.886,  0.01,  0.25,  0.1,
+                                        0.096,  0.109, 0.0};
+    stableAssemblage sAssemblage;
+    if (database == "ig") {
+      sAssemblage.oxideNames = {"SiO2", "AL2O3", "CaO", "MgO",   "FeOt", "K2O",
+                                "Na2O", "TiO2",  "O",   "Cr2O3", "H2O"};
+      sAssemblage.solutionNames = {"SYS", "spl", "bi", "cd",   "cpx",
+                                   "opx", "ep",  "g",  "amp",  "ilm",
+                                   "liq", "mu",  "ol", "pl3T", "fl"};
     }
+    MAGEMin_wrapper wrap;
+    int arg1;
+    char **argv2;
+    wrap.executeMAGEMin(arg1, argv2, TemperatureDummy, PressureDumym,
+                        len_oxides, database, bulkComposition, &sAssemblage);
+    // Test Lines end;
+#endif // ASPECT_WITH_MAGEMin
 
-    if (largestCompIndex == -999) {
-      meltFraction = 0.0;
-    } else {
-      closestMaterialPropertiesIndex =
-          get_closest_index(currT, currP, magelookupFiles, largestCompIndex);
-      if (closestMaterialPropertiesIndex == -999) {
+    const float currDepth = this->get_geometry_model().depth(
+        in.position[q]); // this->get_geometry_model().depth(in.position[q]);
+
+    // Put in a check for composition; This is where I call the function to
+    // calculate closest P and T conditions;
+    float compVal = 0.0;
+    int largestCompIndex = -999;
+    int closestMaterialPropertiesIndex = 0;
+
+    if (currDepth < cutOff_depth) {
+      // Loop through all the compositions(which have a corresponding lookup
+      // table) to find the maximum composition (Only accept if the value is
+      // more than 0.5)
+      for (size_t comp = 0; comp < compositionalLookupNames.size(); comp++) {
+        const unsigned int comp_idx =
+            this->introspection().compositional_index_for_name(
+                compositionalLookupNames[comp]);
+        if (in.composition[q][comp_idx] > compVal &&
+            in.composition[q][comp_idx] > 0.4) {
+          // std::cout<<"\n"<<in.composition[q][comp_idx]<<"\n"<<compositionalLookupNames[comp];
+          largestCompIndex = comp;
+          compVal = in.composition[q][comp_idx];
+        }
+      }
+
+      if (largestCompIndex == -999) {
         meltFraction = 0.0;
       } else {
-        meltFraction =
-            magelookupFiles[largestCompIndex]
-                ->materialProperties[closestMaterialPropertiesIndex][0];
+        closestMaterialPropertiesIndex =
+            get_closest_index(currT, currP, magelookupFiles, largestCompIndex);
+        if (closestMaterialPropertiesIndex == -999) {
+          meltFraction = 0.0;
+        } else {
+          meltFraction =
+              magelookupFiles[largestCompIndex]
+                  ->materialProperties[closestMaterialPropertiesIndex][0];
+        }
       }
+      // std::cout<<"\n"<<compositionalLookupNames[largestCompIndex]<<"
+      // "<<currP<<"  "<<currT<<" "<<meltFraction;
+    } else {
+      meltFraction = 0.0;
     }
-    // std::cout<<"\n"<<compositionalLookupNames[largestCompIndex]<<"
-    // "<<currP<<"  "<<currT<<" "<<meltFraction;
   } else {
     meltFraction = 0.0;
   }
-
   return meltFraction;
 }
 
@@ -256,11 +403,10 @@ double mageminLookup<dim>::melt_fraction(
  */
 template <int dim>
 void mageminLookup<dim>::calculate_reaction_rate_outputs(
-    const typename Interface<dim>::MaterialModelInputs &in,
+    typename Interface<dim>::MaterialModelInputs &in,
     typename Interface<dim>::MaterialModelOutputs &out) const {
   ReactionRateOutputs<dim> *reaction_rate_out =
       out.template get_additional_output<ReactionRateOutputs<dim>>();
-
   for (unsigned int i = 0; i < in.n_evaluation_points(); ++i) {
     if (this->include_melt_transport()) {
       const unsigned int porosity_idx =
@@ -274,14 +420,16 @@ void mageminLookup<dim>::calculate_reaction_rate_outputs(
       double porosity_change = 0.0;
 
       if (fractional_melting) {
-        const double eq_melt_fraction = melt_fraction(in, i);
+        const double eq_melt_fraction =
+            melt_fractionMAGEMin(in, out, i); // melt_fraction(in, i);
         porosity_change = eq_melt_fraction - old_porosity;
       } else {
-        porosity_change =
-            melt_fraction(in, i) - std::max(maximum_melt_fraction, 0.0);
+        double MeltFraction =
+            melt_fractionMAGEMin(in, out, i); // melt_fraction(in, i);
+        porosity_change = MeltFraction - std::max(maximum_melt_fraction, 0.0);
         porosity_change = std::max(porosity_change, 0.0);
 
-        const double eq_melt_fraction = melt_fraction(in, i);
+        const double eq_melt_fraction = MeltFraction;
         const double porosity_change_wrt_melt_fraction =
             std::min(eq_melt_fraction - old_porosity - porosity_change, 0.0);
 
