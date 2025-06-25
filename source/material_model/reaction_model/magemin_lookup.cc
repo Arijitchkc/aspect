@@ -8,9 +8,11 @@
 #include <aspect/gravity_model/interface.h>
 #include <aspect/material_model/reaction_model/magemin_lookup.h>
 #include <aspect/utilities.h>
+#include <cstddef>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/fe/fe_data.h>
 #include <type_traits>
+#include <vector>
 
 namespace aspect {
 namespace MaterialModel {
@@ -227,10 +229,9 @@ double mageminLookup<dim>::melt_fractionMAGEMin(
   float currT_Celcius = currT - 273;
   float currP_kbar = currP / 1e8;
 
-  if (guess_MeltFraction(currP, currT) && currDepth < cutOff_depth) {
+  if (guess_MeltFraction(currP, currT) && currDepth < cutOff_depth &&
+      currDepth > 80e3) {
 
-    std::cout << "\nTesting-- Pressure: " << currP << " Temperature: " << currT
-              << "currDepth : " << currDepth;
     // some variables which need to be changed later;
     int len_oxides = 11;
     char *database = "ig";
@@ -279,32 +280,55 @@ double mageminLookup<dim>::melt_fractionMAGEMin(
     char **dummyArgc1;
     wrap.executeMAGEMin(dummyArg1, dummyArgc1, currT_Celcius, currP_kbar,
                         len_oxides, database, bulkComposition, &sAssemblage);
+
+    std::vector<double> wtFracOxides{};
+    for (size_t i = 0; i < sAssemblage.len_oxides; i++) {
+      double total = 0;
+      for (size_t j = 0; j < sAssemblage.solutionNames.size(); j++) {
+        if (sAssemblage.solutionNames[j] != "SYS" &&
+            sAssemblage.stablePhasesProperties[j][0] != -999.999) {
+          total = total + sAssemblage.oxideCompositions[j][i] *
+                              sAssemblage.stablePhasesProperties[j][0];
+        }
+      }
+      wtFracOxides.push_back(total * 100);
+    }
+
     // Extract and update major oxides and meltiFraction
     out.reaction_terms[q][SiO2_idx] =
-        (in.composition[q][SiO2_idx] - sAssemblage.oxideCompositions[0][0]);
-
+        (in.composition[q][SiO2_idx] - wtFracOxides[0]);
     out.reaction_terms[q][Al2O3_idx] =
-        (in.composition[q][Al2O3_idx] - sAssemblage.oxideCompositions[0][1]);
+        (in.composition[q][Al2O3_idx] - wtFracOxides[1]);
     out.reaction_terms[q][CaO_idx] =
-        (in.composition[q][CaO_idx] - sAssemblage.oxideCompositions[0][2]);
+        (in.composition[q][CaO_idx] - wtFracOxides[2]);
     out.reaction_terms[q][MgO_idx] =
-        (in.composition[q][MgO_idx] - sAssemblage.oxideCompositions[0][3]);
+        (in.composition[q][MgO_idx] - wtFracOxides[3]);
     out.reaction_terms[q][FeOt_idx] =
-        (in.composition[q][FeOt_idx] - sAssemblage.oxideCompositions[0][4]);
+        (in.composition[q][FeOt_idx] - wtFracOxides[4]);
     out.reaction_terms[q][K2O_idx] =
-        (in.composition[q][K2O_idx] - sAssemblage.oxideCompositions[0][5]);
+        (in.composition[q][K2O_idx] - wtFracOxides[5]);
     out.reaction_terms[q][Na2O_idx] =
-        (in.composition[q][Na2O_idx] - sAssemblage.oxideCompositions[0][6]);
+        (in.composition[q][Na2O_idx] - wtFracOxides[6]);
     out.reaction_terms[q][TiO2_idx] =
-        (in.composition[q][TiO2_idx] - sAssemblage.oxideCompositions[0][7]);
-    out.reaction_terms[q][O_idx] =
-        (in.composition[q][O_idx] - sAssemblage.oxideCompositions[0][8]);
+        (in.composition[q][TiO2_idx] - wtFracOxides[7]);
+    out.reaction_terms[q][O_idx] = (in.composition[q][O_idx] - wtFracOxides[8]);
     out.reaction_terms[q][Cr2O3_idx] =
-        (in.composition[q][Cr2O3_idx] - sAssemblage.oxideCompositions[0][9]);
+        (in.composition[q][Cr2O3_idx] - wtFracOxides[9]);
     out.reaction_terms[q][H2O_idx] =
-        (in.composition[q][H2O_idx] - sAssemblage.oxideCompositions[0][10]);
+        (in.composition[q][H2O_idx] - wtFracOxides[10]);
 
-    meltFraction = sAssemblage.stablePhasesProperties[10][0];
+    if (sAssemblage.stablePhasesProperties[10][0] == -999.999) {
+      meltFraction = 0.0;
+    } else {
+      meltFraction = sAssemblage.stablePhasesProperties[10][0];
+    }
+    // meltFraction = sAssemblage.stablePhasesProperties[10][0];
+
+    // std::cout << "\nTesting -- Pressure: " << currP << " Temperature: " <<
+    // currT
+    //           << "currDepth : " << currDepth << " MF: " << meltFraction
+    //           << " Si: " << wtFracOxides[0]
+    //           << " Si Old: " << in.composition[q][SiO2_idx];
     return meltFraction;
   } else {
     meltFraction = 0.0;
@@ -429,15 +453,21 @@ void mageminLookup<dim>::calculate_reaction_rate_outputs(
         porosity_change = eq_melt_fraction - old_porosity;
 
         // assign this melt to a compositional field
-        const unsigned int mageMeltFraction_idx = this->introspection().compositional_index_for_name("mageMeltFraction");
-        out.reaction_terms[i][mageMeltFraction_idx] = eq_melt_fraction - in.composition[i][mageMeltFraction_idx];
+        const unsigned int mageMeltFraction_idx =
+            this->introspection().compositional_index_for_name(
+                "mageMeltFraction");
+        out.reaction_terms[i][mageMeltFraction_idx] =
+            eq_melt_fraction - in.composition[i][mageMeltFraction_idx];
 
       } else {
         double MeltFraction =
             melt_fractionMAGEMin(in, out, i); // melt_fraction(in, i);
-        
-        const unsigned int mageMeltFraction_idx = this->introspection().compositional_index_for_name("mageMeltFraction");
-        out.reaction_terms[i][mageMeltFraction_idx] = MeltFraction - in.composition[i][mageMeltFraction_idx];
+
+        const unsigned int mageMeltFraction_idx =
+            this->introspection().compositional_index_for_name(
+                "mageMeltFraction");
+        out.reaction_terms[i][mageMeltFraction_idx] =
+            MeltFraction - in.composition[i][mageMeltFraction_idx];
 
         porosity_change = MeltFraction - std::max(maximum_melt_fraction, 0.0);
         porosity_change = std::max(porosity_change, 0.0);
