@@ -59,7 +59,7 @@ public:
   // constructor
   mageminLookup();
   // Make object for MAGEMin class
-  MAGEMin_wrapper wrap;
+  mutable MAGEMin_wrapper wrap;
 
   // create a pointer to the structure holding magemin lookuptable properties
 

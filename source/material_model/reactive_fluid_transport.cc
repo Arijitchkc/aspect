@@ -20,6 +20,7 @@
 
 #include <aspect/adiabatic_conditions/interface.h>
 #include <aspect/material_model/reactive_fluid_transport.h>
+#include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/numerics/fe_field_function.h>
 
@@ -452,6 +453,34 @@ void ReactiveFluidTransport<dim>::parse_parameters(ParameterHandler &prm) {
             ExcMessage(
                 "Material model Katz 2003 Mantle Melting only "
                 "works if there is a compositional field called peridotite."));
+      }
+
+      if (fluid_solid_reaction_scheme == magemin) {
+        AssertThrow(this->introspection().compositional_name_exists("SiO2"),
+                    ExcMessage("SiO2 field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("Al2O3"),
+                    ExcMessage("Al2O3 field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("CaO"),
+                    ExcMessage("CaO field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("MgO"),
+                    ExcMessage("MgO field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("FeOt"),
+                    ExcMessage("FeOt field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("K2O"),
+                    ExcMessage("K2O field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("Na2O"),
+                    ExcMessage("Na2O field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("TiO2"),
+                    ExcMessage("TiO2 field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("O"),
+                    ExcMessage("O field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("Cr2O3"),
+                    ExcMessage("Cr2O3 field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("H2O"),
+                    ExcMessage("H2O field needed"));
+        AssertThrow(this->introspection().compositional_name_exists("mageMeltFraction"),
+                    ExcMessage("mageMeltFraction field needed"));
+
       }
     }
     prm.leave_subsection();

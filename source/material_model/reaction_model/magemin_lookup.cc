@@ -218,15 +218,19 @@ double mageminLookup<dim>::melt_fractionMAGEMin(
 
   // Calculate Pressure and Temperature for the index
 
-  float currP =
-      this->get_adiabatic_surface_temperature().pressure(in.position[q]);
+  float currP = this->get_adiabatic_conditions().pressure(in.position[q]);
   const float currT = in.temperature[q];
+  const float currDepth = this->get_geometry_model().depth(
+      in.position[q]); // this->get_geometry_model().depth(in.position[q]);
 
   // Convert variables into MAGEMin units;
   float currT_Celcius = currT - 273;
   float currP_kbar = currP / 1e8;
 
-  if (guess_MeltFraction(currP, currT)) {
+  if (guess_MeltFraction(currP, currT) && currDepth < cutOff_depth) {
+
+    std::cout << "\nTesting-- Pressure: " << currP << " Temperature: " << currT
+              << "currDepth : " << currDepth;
     // some variables which need to be changed later;
     int len_oxides = 11;
     char *database = "ig";
@@ -271,8 +275,8 @@ double mageminLookup<dim>::melt_fractionMAGEMin(
         in.composition[q][O_idx],    in.composition[q][Cr2O3_idx],
         in.composition[q][H2O_idx]};
 
-    int dummyArg1;
-    char dummyArgc1;
+    int dummyArg1 = 0;
+    char **dummyArgc1;
     wrap.executeMAGEMin(dummyArg1, dummyArgc1, currT_Celcius, currP_kbar,
                         len_oxides, database, bulkComposition, &sAssemblage);
     // Extract and update major oxides and meltiFraction
@@ -403,7 +407,7 @@ double mageminLookup<dim>::melt_fraction(
  */
 template <int dim>
 void mageminLookup<dim>::calculate_reaction_rate_outputs(
-    typename Interface<dim>::MaterialModelInputs &in,
+    const typename Interface<dim>::MaterialModelInputs &in,
     typename Interface<dim>::MaterialModelOutputs &out) const {
   ReactionRateOutputs<dim> *reaction_rate_out =
       out.template get_additional_output<ReactionRateOutputs<dim>>();
@@ -423,9 +427,18 @@ void mageminLookup<dim>::calculate_reaction_rate_outputs(
         const double eq_melt_fraction =
             melt_fractionMAGEMin(in, out, i); // melt_fraction(in, i);
         porosity_change = eq_melt_fraction - old_porosity;
+
+        // assign this melt to a compositional field
+        const unsigned int mageMeltFraction_idx = this->introspection().compositional_index_for_name("mageMeltFraction");
+        out.reaction_terms[i][mageMeltFraction_idx] = eq_melt_fraction - in.composition[i][mageMeltFraction_idx];
+
       } else {
         double MeltFraction =
             melt_fractionMAGEMin(in, out, i); // melt_fraction(in, i);
+        
+        const unsigned int mageMeltFraction_idx = this->introspection().compositional_index_for_name("mageMeltFraction");
+        out.reaction_terms[i][mageMeltFraction_idx] = MeltFraction - in.composition[i][mageMeltFraction_idx];
+
         porosity_change = MeltFraction - std::max(maximum_melt_fraction, 0.0);
         porosity_change = std::max(porosity_change, 0.0);
 
@@ -731,7 +744,7 @@ void mageminLookup<dim>::declare_parameters(ParameterHandler &prm) {
                     "Reference permeability of the solid host rock."
                     "Units: \\si{\\meter\\squared}.");
   prm.declare_entry(
-      "Cutoff depth for magemin", "300e3", Patterns::Double(),
+      "Cutoff depth for magemin", "250e3", Patterns::Double(),
       "Cutoff depth: Melting will only be considered above this depth"
       "Units: \\si{\\meter}.");
 }
