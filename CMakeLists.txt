@@ -126,24 +126,24 @@ message(STATUS "Found deal.II version ${DEAL_II_PACKAGE_VERSION} at '${deal.II_D
 set(_DEALII_GOOD ON)
 
 if(NOT DEAL_II_WITH_P4EST)
-    message(SEND_ERROR
+  message(SEND_ERROR
       "\n-- deal.II was built without support for p4est!\n"
       )
-    set(_DEALII_GOOD OFF)
+  set(_DEALII_GOOD OFF)
 endif()
 
 if(NOT DEAL_II_WITH_TRILINOS)
-    message(SEND_ERROR
+  message(SEND_ERROR
       "\n-- deal.II was built without support for Trilinos!\n"
       )
-    set(_DEALII_GOOD OFF)
+  set(_DEALII_GOOD OFF)
 endif()
 
 if(NOT DEAL_II_WITH_SUNDIALS)
-    message(SEND_ERROR
+  message(SEND_ERROR
       "\n-- deal.II was built without support for SUNDIALS!\n"
       )
-    set(_DEALII_GOOD OFF)
+  set(_DEALII_GOOD OFF)
 endif()
 
 if(NOT _DEALII_GOOD)
@@ -180,7 +180,6 @@ else()
   set(ASPECT_WITH_PERPLEX OFF)
 endif()
 
-
 # libdap so that ASPECT can connect to the OPeNDAP servers
 set(ASPECT_WITH_LIBDAP OFF CACHE BOOL "Check if the user wants to compile ASPECT with the libdap libraries.")
 message(STATUS "Using ASPECT_WITH_LIBDAP = '${ASPECT_WITH_LIBDAP}'")
@@ -201,14 +200,14 @@ message(STATUS "Using ASPECT_WITH_FASTSCAPE = '${ASPECT_WITH_FASTSCAPE}'")
 if(ASPECT_WITH_FASTSCAPE)
   find_library(FASTSCAPE NAMES fastscapelib_fortran PATHS $ENV{FASTSCAPE_DIR} ${FASTSCAPE_DIR} PATH_SUFFIXES lib NO_DEFAULT_PATH)
   if(FASTSCAPE)
-     message(STATUS "FastScape library found at ${FASTSCAPE_DIR}")
+    message(STATUS "FastScape library found at ${FASTSCAPE_DIR}")
 
     # Get the fastscape source path so we can check the version.
     file(STRINGS "${FASTSCAPE_DIR}/Makefile" _fastscape_makefile)
     foreach(_line ${_fastscape_makefile})
-        if("${_line}" MATCHES "^CMAKE_SOURCE_DIR")
-          string(REPLACE "CMAKE_SOURCE_DIR = " "" FASTSCAPE_SOURCE_DIR ${_line})
-        endif()
+      if("${_line}" MATCHES "^CMAKE_SOURCE_DIR")
+        string(REPLACE "CMAKE_SOURCE_DIR = " "" FASTSCAPE_SOURCE_DIR ${_line})
+      endif()
     endforeach()
 
     # Now get the version from setup.py
@@ -226,7 +225,7 @@ if(ASPECT_WITH_FASTSCAPE)
       message(FATAL_ERROR "The linked FastScape version is ${FASTSCAPE_VERSION}, however at least 2.8.0 is required.")
     endif()
   else()
-     message(FATAL_ERROR "Trying to link with FastScape but libfastscapelib_fortran.so was not found in ${FASTSCAPE_DIR}")
+    message(FATAL_ERROR "Trying to link with FastScape but libfastscapelib_fortran.so was not found in ${FASTSCAPE_DIR}")
   endif()
 endif()
 
@@ -248,6 +247,20 @@ if(ASPECT_WITH_NETCDF)
 else()
   message(STATUS "Using ASPECT_WITH_NETCDF = 'OFF'")
 endif()
+
+
+
+# MAGEMin
+set(ASPECT_WITH_MAGEMin ON CACHE BOOL "Whether the user wants to compile ASPECT with MAGEMin, or not.")
+message(STATUS "Using ASPECT_WITH_MAGEMin = '${ASPECT_WITH_MAGEMin}'")
+# find_package(MAGEMin REQUIRED
+# HINTS ./contrib/MAGEMin/ ${MAGEMIN_DIR} $ENV{MAGEMIN_DIR})
+if(ASPECT_WITH_MAGEMin)
+  set(MAGEMin_SOURCE_DIR "${CMAKE_SOURCE_DIR}/contrib/MAGEMin/" CACHE PATH "" FORCE)
+  include_directories("${MAGEMin_SOURCE_DIR}/src/")
+  add_subdirectory(${MAGEMin_SOURCE_DIR})
+endif()
+
 
 
 # WorldBuilder
@@ -392,7 +405,7 @@ configure_file(${CMAKE_SOURCE_DIR}/include/aspect/revision.h.in
 # floating point exceptions when converting -numeric_limits<double>::max to a
 # string. The only thing we can do is a configure check and disable the
 # exceptions. This is done here:
-set(ASPECT_USE_FP_EXCEPTIONS ON CACHE BOOL "If ON, floating point exception are raised in debug mode.")
+set(ASPECT_USE_FP_EXCEPTIONS OFF CACHE BOOL "If ON, floating point exception are raised in debug mode.")
 
 # Clang 6.0 throws random floating point exceptions, which we could not
 # track down. Disable the exceptions for now.
@@ -654,7 +667,7 @@ endif()
 
 # Provide "release" and "debug" targets to switch compile mode
 if(${DEAL_II_BUILD_TYPE} MATCHES "DebugRelease")
-add_custom_target(release
+  add_custom_target(release
   COMMAND ${CMAKE_COMMAND} -D CMAKE_BUILD_TYPE=Release .
   COMMAND ${CMAKE_COMMAND} -E echo "***"
   COMMAND ${CMAKE_COMMAND} -E echo "*** Switched to Release mode. Now recompile with: ${_make_command}"
@@ -663,7 +676,7 @@ add_custom_target(release
   VERBATIM
   COMMENT "switching to RELEASE mode..."
   )
-add_custom_target(debug
+  add_custom_target(debug
   COMMAND ${CMAKE_COMMAND} -D CMAKE_BUILD_TYPE=Debug .
   COMMAND ${CMAKE_COMMAND} -E echo "***"
   COMMAND ${CMAKE_COMMAND} -E echo "*** Switched to Debug mode. Now recompile with: ${_make_command}"
@@ -672,7 +685,7 @@ add_custom_target(debug
   VERBATIM
   COMMENT "switching to DEBUG mode..."
   )
-add_custom_target(debugrelease
+  add_custom_target(debugrelease
   COMMAND ${CMAKE_COMMAND} -D CMAKE_BUILD_TYPE=DebugRelease .
   COMMAND ${CMAKE_COMMAND} -E echo "***"
   COMMAND ${CMAKE_COMMAND} -E echo "*** Switched to Debug and Release mode. Now recompile with: ${_make_command}"
@@ -827,7 +840,7 @@ add_custom_target(aspect ALL
                   DEPENDS ${TARGET_EXE}
                   COMMENT "Creating symlink from ${TARGET_EXE} to './aspect'")
 install(PROGRAMS ${CMAKE_BINARY_DIR}/aspect
-	TYPE BIN)
+ TYPE BIN)
 
 # This should be done in DEAL_II_SETUP_TARGET, but deal.II 9.5
 # does not do so, so do it here. Remove this when we require deal.II 9.6.
@@ -857,12 +870,28 @@ if(${ZLIB_FOUND})
 endif()
 
 # PerpleX
+message("perplex ${PerpleX_FOUND}")
 if(${PerpleX_FOUND})
   message(STATUS "Linking ASPECT against PerpleX")
   include_directories(${PerpleX_INCLUDE_DIR})
   foreach(_T ${TARGET_EXECUTABLES})
     target_link_libraries(${_T} ${PerpleX_LIBRARIES})
   endforeach()
+endif()
+
+#MAGEMin
+if(ASPECT_WITH_MAGEMin)
+  message(STATUS "Linking ASPECT against MAGEMin")
+
+  if(${ASPECT_BUILD_DEBUG} STREQUAL "ON")
+    target_include_directories(${TARGET_EXE_DEBUG} PUBLIC ${MAGEMin_SOURCE_DIR}/src/ ${MAGEMin_SOURCE_DIR}/src/SB_database/ ${MAGEMin_SOURCE_DIR}/src/TC_database/)
+    target_link_libraries(${TARGET_EXE_DEBUG} MAGEMin_cpp)
+  endif()
+
+  if(${ASPECT_BUILD_RELEASE} STREQUAL "ON")
+    target_include_directories(${TARGET_EXE_RELEASE} PUBLIC ${MAGEMin_SOURCE_DIR}/src/ ${MAGEMin_SOURCE_DIR}/src/SB_database/ ${MAGEMin_SOURCE_DIR}/src/TC_database/)
+    target_link_libraries(${TARGET_EXE_RELEASE} MAGEMin_cpp)
+  endif()
 endif()
 
 # libdap
@@ -881,6 +910,7 @@ if (FASTSCAPE)
     target_link_libraries(${_T} ${FASTSCAPE})
   endforeach()
 endif()
+
 
 # NetCDF
 if(${NETCDF_FOUND})
@@ -952,25 +982,6 @@ else()
 endif()
 
 
-# Include MAGEMIN
-set(ASPECT_WITH_MAGEMin ON CACHE BOOL "Whether the user wants to compile ASPECT with MAGEMin or not.")
-message(STATUS "Using ASEPCT_WITH_MAGEMin = ${ASPECT_WITH_MAGEMin}")
-if(ASPECT_WITH_MAGEMin)
-  message(STATUS "Using contrib folder version.")
-  set(MAGEMin_SOURCE_DIR "${CMAKE_SOURCE_DIR}/contrib/MAGEMin/" CACHE PATH "" FORCE)
-  add_subdirectory(${MAGEMin_SOURCE_DIR})
-
-  if(${ASPECT_BUILD_DEBUG} STREQUAL "ON")
-    target_include_directories(${TARGET_EXE_DEBUG} PUBLIC ${MAGEMin_SOURCE_DIR}/src/ ${MAGEMin_SOURCE_DIR}/src/SB_database/ ${MAGEMin_SOURCE_DIR}/src/TC_database/)
-    target_link_libraries(${TARGET_EXE_DEBUG} MAGEMin_cpp) 
-  endif()
-  
-  if(${ASPECT_BUILD_RELEASE} STREQUAL "ON")
-    target_include_directories(${TARGET_EXE_RELEASE} PUBLIC ${MAGEMin_SOURCE_DIR}/src/ ${MAGEMin_SOURCE_DIR}/src/SB_database/ ${MAGEMin_SOURCE_DIR}/src/TC_database/)
-    target_link_libraries(${TARGET_EXE_RELEASE} MAGEMin_cpp) 
-  endif()
-endif()
-
 #
 ## installation
 #
@@ -1031,7 +1042,7 @@ MESSAGE(STATUS "===== Configuring ASPECT documentation =============")
 
 # Start with the documentation
 
-add_subdirectory(doc)
+Add_subdirectory(doc)
 
 include(cmake/write_config)
 

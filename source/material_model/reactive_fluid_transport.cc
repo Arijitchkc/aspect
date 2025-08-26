@@ -71,10 +71,10 @@ void ReactiveFluidTransport<dim>::melt_fractions(
       melt_fractions[q] = tian2019_model.melt_fraction(in, porosity_idx, q);
       break;
     }
-    case magemin: {
-      melt_fractions[q] = mageM.melt_fraction(in, q);
-      break;
-    }
+    // case magemin: {
+    //   melt_fractions[q] = mageM.melt_fractionMAGEMin(in, q);
+    //   break;
+    // }
     case katz2003: {
       melt_fractions[q] = katz2003_model.melt_fraction(
           in.temperature[q],
@@ -186,7 +186,6 @@ void ReactiveFluidTransport<dim>::evaluate(
         }
     }
   } else if (fluid_solid_reaction_scheme == magemin) {
-
     mageM.calculate_reaction_rate_outputs(in, out);
     mageM.calculate_fluid_outputs(in, out, reference_T);
   } else if (fluid_solid_reaction_scheme == katz2003) {
@@ -478,9 +477,9 @@ void ReactiveFluidTransport<dim>::parse_parameters(ParameterHandler &prm) {
                     ExcMessage("Cr2O3 field needed"));
         AssertThrow(this->introspection().compositional_name_exists("H2O"),
                     ExcMessage("H2O field needed"));
-        AssertThrow(this->introspection().compositional_name_exists("mageMeltFraction"),
-                    ExcMessage("mageMeltFraction field needed"));
-
+        AssertThrow(
+            this->introspection().compositional_name_exists("mageMeltFraction"),
+            ExcMessage("mageMeltFraction field needed"));
       }
     }
     prm.leave_subsection();

@@ -100,7 +100,7 @@ public:
    * Function which uses Katz parameterization of solidus lines to predict melt;
    * just to reduce number of points where we call MAGEMin_cpp
    */
-  bool guess_MeltFraction(double pressure, double temperature) const;
+  double guess_MeltFraction(double pressure, double temperature) const;
 
   void calculate_reaction_rate_outputs(
       const typename Interface<dim>::MaterialModelInputs &in,
@@ -181,6 +181,16 @@ private:
   double A1 = 1085.7;
   double A2 = 1.329e-7;
   double A3 = -5.1e-18;
+  double B1 = 1475;
+  double B2 = 8.0e-8;
+  double B3 = -3.2e-18;
+  double C1 = 1780.0;
+  double C2 = 4.50e-8;
+  double C3 = -2.0e-18;
+  double r1 = 0.5;
+  double r2 = 8e-11;
+  double beta = 1.5;
+  double M_cpx = 0.15;
 
   // std::vector<std::vector<double>> compositionalLookupNames;
   // std::vector<std::vector<double>> compositionalLookupFileNames;
