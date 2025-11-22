@@ -500,7 +500,7 @@ double mageminLookup<dim>::melt_fractionMAGEMin(
           }
         }
         wtFracOxides_solid.push_back(total_s * 100);
-        wtFracOxides_liquid.push_back(total_l*100);
+        wtFracOxides_liquid.push_back(total_l * 100);
       }
 
       // std::cout << "\n\n\n Before update Line Compositions | SiO2: "

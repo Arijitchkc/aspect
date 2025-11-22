@@ -71,10 +71,10 @@ void ReactiveFluidTransport<dim>::melt_fractions(
       melt_fractions[q] = tian2019_model.melt_fraction(in, porosity_idx, q);
       break;
     }
-    // case magemin: {
-    //   melt_fractions[q] = mageM.melt_fractionMAGEMin(in, q);
-    //   break;
-    // }
+    case magemin: {
+      melt_fractions[q] = mageM.guess_MeltFraction(in.temperature[q] ,this->get_adiabatic_conditions().pressure(in.position[q]));
+      break;
+    }
     case katz2003: {
       melt_fractions[q] = katz2003_model.melt_fraction(
           in.temperature[q],
