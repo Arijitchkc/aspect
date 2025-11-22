@@ -28,10 +28,9 @@
 #include <aspect/parameters.h>
 
 #include <deal.II/grid/tria.h>
-#include <deal.II/base/exceptions.h>
+
 #include <memory>
 #include <functional>
-
 #include <iostream>
 
 namespace aspect
@@ -165,8 +164,8 @@ namespace aspect
     simulator_access.get_material_model().evaluate(in_base, out_base);
 
     // set up additional output for the derivatives
-    MaterialModelDerivatives<dim> *derivatives;
-    derivatives = out_base.template get_additional_output<MaterialModelDerivatives<dim>>();
+    const std::shared_ptr<MaterialModelDerivatives<dim>> derivatives
+      = out_base.template get_additional_output_object<MaterialModelDerivatives<dim>>();
     double temp;
 
     // have a bool so we know whether the test has succeed or not.

@@ -1,3 +1,12 @@
+```{tags}
+category:benchmark
+feature:2d
+feature:cartesian
+feature:community-benchmark
+feature:analytical-solution
+```
+
+(sec:benchmarks:rayleigh_taylor_instability)=`
 # The Rayleigh-Taylor instability
 
 *This section was contributed by Cedric Thieulot.*
@@ -57,7 +66,7 @@ file:
     end
 
 
-**[Description of benchmark files](../README)**
+**[Description of benchmark files](https://github.com/geodynamics/aspect/blob/main/benchmarks/rayleigh_taylor_instability/README.md)**
 
 ```{figure-md} fig:RTi_grids_a
 <img src="grid.*" style="width:44.0%" />

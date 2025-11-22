@@ -13,6 +13,14 @@
 
 **Documentation:** By default, every cell needs to contain particles to use this interpolator plugin. If this parameter is set to true, cells are allowed to have no particles. In case both the current cell and its neighbors are empty, the interpolator will return 0 for the current cell&rsquo;s properties.
 
+(parameters:Particles_202/Bandwidth)=
+### __Parameter name:__ Bandwidth
+**Default value:** 0.3
+
+**Pattern:** [Double 0.3...MAX_DOUBLE (inclusive)]
+
+**Documentation:** The bandwidth value is used to scale the kernel function when generating the point density function of particles. The bandwidth is measured as a fraction of the cells extent in one spatial dimension. For example, the default bandwidth of 0.3 represents a size equal to 30 percent of the cells size in one spatial dimension.
+
 (parameters:Particles_202/Integration_20scheme)=
 ### __Parameter name:__ Integration scheme
 **Default value:** rk2
@@ -57,7 +65,7 @@ Select one of the following models:
 ### __Parameter name:__ List of particle properties
 **Default value:**
 
-**Pattern:** [MultipleSelection composition|cpo bingham average|cpo elastic tensor|crystal preferred orientation|elastic stress|elastic tensor decomposition|function|grain size|initial composition|initial position|integrated strain|integrated strain invariant|melt particle|pT path|position|reference position|strain rate|velocity|viscoplastic strain invariants ]
+**Pattern:** [MultipleSelection composition|composition reaction|cpo bingham average|cpo elastic tensor|crust and lithosphere formation|crystal preferred orientation|elastic stress|elastic tensor decomposition|function|grain size|initial composition|initial position|integrated strain|integrated strain invariant|melt particle|pT path|position|reference position|strain rate|velocity|velocity gradient|viscoplastic strain invariants ]
 
 **Documentation:** A comma separated list of particle properties that should be tracked. By default none is selected, which means only position, velocity and id of the particles are output.
 
@@ -65,13 +73,17 @@ The following properties are available:
 
 &lsquo;composition&rsquo;: Implementation of a plugin in which the particle property is defined by the compositional fields in the model. This can be used to track solid compositionevolution over time.
 
+&lsquo;composition reaction&rsquo;: Implementation of a plugin in which the particle property is given as the initial composition at the particle&rsquo;s initial position, and is updated during the simulation time according to reactions that are specified as functions in the input file. Each reaction has exactly one reactant and one product. Each particle gets as many properties as there are compositional fields. The reactions are described by two functions, and the change in each composition at the time a reaction occurs is computed as the product of the two functions. The &rsquo;Reaction area function&rsquo; describes the area where the reaction takes place. It can be spatially variable, but does not depend on time. The &rsquo;Reaction rate function&rsquo; describes how the change in composition depends on these compositions themselves and on time. To use this particle property for a given compositional field, set the &rsquo;Mapped particle properties&rsquo; to &rsquo;name_of_field:name_of_field reaction&rsquo;, i.e., the name of the particle property for each field is the name of the compositional field with the word &rsquo;reaction&rsquo; added at the end.
+
 &lsquo;cpo bingham average&rsquo;: This is a particle property plugin which computes the Bingham average for the Crystal Preferred Orientation particle property plugin so that it can be visualized.
 
 &lsquo;cpo elastic tensor&rsquo;: A plugin in which the particle property tensor is defined as the Voigt average of the elastic tensors of the minerals in the textured rock.Currently only Olivine and Enstatite are supported.
 
+&lsquo;crust and lithosphere formation&rsquo;: A plugin in which the particle property is defined as the evolving chemical composition that results from the formation of oceanic crust and lithosphere as mantle material approaches the surface and melts. Note that this does not necessarily conserves the bulk chemical composition of the mantle, since the conversion only depends on the mantle flow. See the crust and lithosphere formation reaction model documentation for more detailed information.
+
 &lsquo;crystal preferred orientation&rsquo;: WARNING: all the CPO plugins are a work in progress and not ready for production use yet. See https://github.com/geodynamics/aspect/issues/3885 for current status and alternatives. The plugin manages and computes the evolution of Lattice/Crystal Preferred Orientations (LPO/CPO) on particles. Each ASPECT particle can be assigned many grains. Each grain is assigned a size and a orientation matrix. This allows for CPO evolution tracking with polycrystalline kinematic CrystalPreferredOrientation evolution models such as D-Rex (Kaminski and Ribe, 2001; Kaminski et al., 2004).
 
-&lsquo;elastic stress&rsquo;: A plugin in which the particle property tensor is defined as the total elastic stress a particle has accumulated. See the viscoelastic material model documentation for more detailed information.
+&lsquo;elastic stress&rsquo;: A plugin in which the particle property tensor is defined as the total elastic stress a particle has accumulated. This plugin modifies the properties with the name ve_stress_*. It first applies the stress change resulting from system evolution during the previous computational timestep, and then the rotation of those stresses into the current timestep. See the viscoelastic or visco_plastic material model documentation for more detailed information.
 
 &lsquo;elastic tensor decomposition&rsquo;: A plugin which decomposes the elastic tensor into different approximations (Isotropic, Hexagonal, Tetragonal, Orthorhombic, Monoclinic and Triclinic) and provides the eigenvectors of the tensor.
 
@@ -98,6 +110,8 @@ The following properties are available:
 &lsquo;strain rate&rsquo;: Implementation of a plugin in which the time evolution of strain rate is saved and stored on the particles.
 
 &lsquo;velocity&rsquo;: Implementation of a plugin in which the particle property is defined as the recent velocity at this position.
+
+&lsquo;velocity gradient&rsquo;: Implementation of a plugin in which the particle property is defined as the recent velocity gradient at this position.
 
 &lsquo;viscoplastic strain invariants&rsquo;: A plugin that calculates the finite strain invariant a particle has experienced and assigns it to either the plastic and/or viscous strain field based on whether the material is plastically yielding, or the total strain field used in the visco plastic material model. The implementation of this property is equivalent to the implementation for compositional fields that is located in the plugin in `benchmarks/buiter\_et\_al\_2008\_jgr/plugin/`,and is effectively the same as what the visco plastic material model uses for compositional fields.
 
@@ -147,6 +161,14 @@ The following properties are available:
 
 &lsquo;uniform radial&rsquo;: Generate a uniform distribution of particles over a spherical domain in 2d or 3d. Uniform here means the particles will be generated with an equal spacing in each spherical spatial dimension, i.e., the particles are created at positions that increase linearly with equal spacing in radius, colatitude and longitude around a certain center point. Note that in order to produce a regular distribution the number of generated particles might not exactly match the one specified in the input file.
 
+(parameters:Particles_202/Particle_20removal_20algorithm)=
+### __Parameter name:__ Particle removal algorithm
+**Default value:** random
+
+**Pattern:** [Selection random|point density function ]
+
+**Documentation:** Algorithm used to delete excess particles from cells. If point density function is chosen, the particle manager will generate a point density function from the locations of each particle and remove the particle whose position is at the maximum of the point density function.
+
 (parameters:Particles_202/Particle_20weight)=
 ### __Parameter name:__ Particle weight
 **Default value:** 10
@@ -154,6 +176,14 @@ The following properties are available:
 **Pattern:** [Integer range 0...2147483647 (inclusive)]
 
 **Documentation:** Weight that is associated with the computational load of a single particle. The sum of particle weights will be added to the sum of cell weights to determine the partitioning of the mesh if the &lsquo;repartition&rsquo; particle load balancing strategy is selected. The optimal weight depends on the used integrator and particle properties. In general for a more expensive integrator and more expensive properties a larger particle weight is recommended. Before adding the weights of particles, each cell already carries a weight of 1000 to account for the cost of field-based computations.
+
+(parameters:Particles_202/Point_20density_20kernel_20function)=
+### __Parameter name:__ Point density kernel function
+**Default value:** cutoff c1 dealii
+
+**Pattern:** [Selection cutoff c1 dealii|cutoff w1 dealii|uniform|triangular|gaussian ]
+
+**Documentation:** The kernel function is summed at each particle location to generate a point density function of the particle locations according to a process known as kernel density estimation. Because kernel density estimation sums the value of a kernel function centered on each point of interest to every other point in the dataset, the only parameter of each kernel function is the distance between the particles, and each kernel function only returns a single value depending on this distance. The return value of each function is also scaled by the selected bandwidth value.The gaussian function uses the gaussian distribution to generate an output from the input distance. The output of the triangular function decreases at a constant rate with increasing distance between the particles. The uniform function returns a constant value as long as the distance between particles is less than the selected bandwidth.The cutoff w1 and cutoff c1 dealii options call the deal.II functions called cutoffW1 and cutoffC1 respectively. These are functions whose return values decrease with distance. A more detailed explanation on these two function are available in the deal.II documentation.
 
 (parameters:Particles_202/Update_20ghost_20particles)=
 ### __Parameter name:__ Update ghost particles
@@ -180,6 +210,124 @@ The following properties are available:
 **Pattern:** [Integer range 0...2147483647 (inclusive)]
 
 **Documentation:** The seed used to generate random numbers. This will make sure that results are reproducible as long as the problem is run with the same amount of MPI processes. It is implemented as final seed = Random number seed + MPI Rank.
+
+(parameters:Particles_202/CPO_20Bingham_20Average/Use_20rotation_20matrix)=
+### __Parameter name:__ Use rotation matrix
+**Default value:** true
+
+**Pattern:** [Bool]
+
+**Documentation:** This determines whether the orientations will be saved as rotation matrices or Euler angles. Setting it to fause means that the orientations will be saved as Euler angles.
+
+(parameters:Particles_202/Composition_20reaction)=
+## **Subsection:** Particles 2 / Composition reaction
+(parameters:Particles_202/Composition_20reaction/List_20of_20products)=
+### __Parameter name:__ List of products
+**Default value:**
+
+**Pattern:** [List of <[Anything]> of length 0...4294967295 (inclusive)]
+
+**Documentation:** Select the compositional fields that are the reaction outputs. Each entry represents the output of one reaction. The parameter should contain a list of compositional field names, one per reaction. &rsquo;background&rsquo; can be selected to set up a reaction without products. Needs to have as many entries as the &rsquo;List of reactants&rsquo;.
+
+(parameters:Particles_202/Composition_20reaction/List_20of_20reactants)=
+### __Parameter name:__ List of reactants
+**Default value:**
+
+**Pattern:** [List of <[Anything]> of length 0...4294967295 (inclusive)]
+
+**Documentation:** Select the compositional fields that are the reaction inputs. Each entry represents the input for one reaction. The parameter should contain a list of compositional field names, one per reaction. &rsquo;background&rsquo; can be selected to set up a reaction without reactants. The length of this list determines the number of components in the reaction function.
+
+(parameters:Particles_202/Composition_20reaction/List_20of_20reaction_20times)=
+### __Parameter name:__ List of reaction times
+**Default value:**
+
+**Pattern:** [List of <[Double 0...MAX_DOUBLE (inclusive)]> of length 0...4294967295 (inclusive)]
+
+**Documentation:** List a specific point in time when each reaction should occur during the simulation. If set to zero, the reaction occurs throughout the whole simulation.Units: yr or s, depending on the &ldquo;Use years instead of seconds&rdquo; parameter.
+
+(parameters:Particles_202/Composition_20reaction/Reaction_20area_20function)=
+## **Subsection:** Particles 2 / Composition reaction / Reaction area function
+(parameters:Particles_202/Composition_20reaction/Reaction_20area_20function/Coordinate_20system)=
+### __Parameter name:__ Coordinate system
+**Default value:** cartesian
+
+**Pattern:** [Selection depth|cartesian|spherical ]
+
+**Documentation:** A selection that determines the assumed coordinate system for the function variables. Allowed values are &lsquo;depth&rsquo;, &lsquo;cartesian&rsquo; and &lsquo;spherical&rsquo;. &lsquo;depth&rsquo; will create a function with only the first variable being is non-zero, and this first variable is interpreted as the depth of the point. &lsquo;spherical&rsquo; coordinates are interpreted as r,phi or r,phi,theta in 2d/3d, respectively, with theta being the polar angle.
+
+(parameters:Particles_202/Composition_20reaction/Reaction_20area_20function/Function_20constants)=
+### __Parameter name:__ Function constants
+**Default value:**
+
+**Pattern:** [Anything]
+
+**Documentation:** Sometimes it is convenient to use symbolic constants in the expression that describes the function, rather than having to use its numeric value everywhere the constant appears. These values can be defined using this parameter, in the form &lsquo;var1=value1, var2=value2, ...&rsquo;.
+
+A typical example would be to set this runtime parameter to &lsquo;pi=3.1415926536&rsquo; and then use &lsquo;pi&rsquo; in the expression of the actual formula. (That said, for convenience this class actually defines both &lsquo;pi&rsquo; and &lsquo;Pi&rsquo; by default, but you get the idea.)
+
+(parameters:Particles_202/Composition_20reaction/Reaction_20area_20function/Function_20expression)=
+### __Parameter name:__ Function expression
+**Default value:** 0
+
+**Pattern:** [Anything]
+
+**Documentation:** The formula that denotes the function you want to evaluate for particular values of the independent variables. This expression may contain any of the usual operations such as addition or multiplication, as well as all of the common functions such as &lsquo;sin&rsquo; or &lsquo;cos&rsquo;. In addition, it may contain expressions like &lsquo;if(x>0, 1, -1)&rsquo; where the expression evaluates to the second argument if the first argument is true, and to the third argument otherwise. For a full overview of possible expressions accepted see the documentation of the muparser library at http://muparser.beltoforion.de/.
+
+If the function you are describing represents a vector-valued function with multiple components, then separate the expressions for individual components by a semicolon.
+
+(parameters:Particles_202/Composition_20reaction/Reaction_20area_20function/Variable_20names)=
+### __Parameter name:__ Variable names
+**Default value:** x,y,t
+
+**Pattern:** [Anything]
+
+**Documentation:** The names of the variables as they will be used in the function, separated by commas. By default, the names of variables at which the function will be evaluated are &lsquo;x&rsquo; (in 1d), &lsquo;x,y&rsquo; (in 2d) or &lsquo;x,y,z&rsquo; (in 3d) for spatial coordinates and &lsquo;t&rsquo; for time. You can then use these variable names in your function expression and they will be replaced by the values of these variables at which the function is currently evaluated. However, you can also choose a different set of names for the independent variables at which to evaluate your function expression. For example, if you work in spherical coordinates, you may wish to set this input parameter to &lsquo;r,phi,theta,t&rsquo; and then use these variable names in your function expression.
+
+(parameters:Particles_202/Composition_20reaction/Reaction_20rate_20function)=
+## **Subsection:** Particles 2 / Composition reaction / Reaction rate function
+(parameters:Particles_202/Composition_20reaction/Reaction_20rate_20function/Function_20constants)=
+### __Parameter name:__ Function constants
+**Default value:**
+
+**Pattern:** [Anything]
+
+**Documentation:** Sometimes it is convenient to use symbolic constants in the expression that describes the function, rather than having to use its numeric value everywhere the constant appears. These values can be defined using this parameter, in the form &lsquo;var1=value1, var2=value2, ...&rsquo;.
+
+A typical example would be to set this runtime parameter to &lsquo;pi=3.1415926536&rsquo; and then use &lsquo;pi&rsquo; in the expression of the actual formula. (That said, for convenience this class actually defines both &lsquo;pi&rsquo; and &lsquo;Pi&rsquo; by default, but you get the idea.)
+
+(parameters:Particles_202/Composition_20reaction/Reaction_20rate_20function/Function_20expression)=
+### __Parameter name:__ Function expression
+**Default value:** 1.
+
+**Pattern:** [Anything]
+
+**Documentation:** Expression for the change in value of the reactant and reaction product for each reaction, in dependence of the current values of reactant and reaction product. One expression for each reaction should be listed, separated by semicolons.
+
+(parameters:Particles_202/Composition_20reaction/Reaction_20rate_20function/Variable_20names)=
+### __Parameter name:__ Variable names
+**Default value:** reactant,product,t
+
+**Pattern:** [Anything]
+
+**Documentation:** The names of the variables as they will be used in the function, separated by commas. Instead of spatial coordinates, the inputs for this function represent the value of the &lsquo;reactant&rsquo; and &lsquo;product&rsquo; compositions so that the value of the current composition can be used to calculate the change due to the reaction. Additionally, &lsquo;t&rsquo; represents the time. You can use these variable names in your function expression and they will be replaced by the values of these variables at which the function is currently evaluated. However, you can also choose a different set of names for the independent variables at which to evaluate your function expression.
+
+(parameters:Particles_202/Crust_20and_20lithosphere_20formation)=
+## **Subsection:** Particles 2 / Crust and lithosphere formation
+(parameters:Particles_202/Crust_20and_20lithosphere_20formation/Crustal_20thickness)=
+### __Parameter name:__ Crustal thickness
+**Default value:** 7000
+
+**Pattern:** [Double -MAX_DOUBLE...MAX_DOUBLE (inclusive)]
+
+**Documentation:** Thickness of the crustal layer generated at the surface.Units: \si{\meter}.
+
+(parameters:Particles_202/Crust_20and_20lithosphere_20formation/Lithosphere_20thickness)=
+### __Parameter name:__ Lithosphere thickness
+**Default value:** 63000
+
+**Pattern:** [Double -MAX_DOUBLE...MAX_DOUBLE (inclusive)]
+
+**Documentation:** Thickness of the lithosphere layer generated below the crust.Units: \si{\meter}.
 
 (parameters:Particles_202/Crystal_20Preferred_20Orientation)=
 ## **Subsection:** Particles 2 / Crystal Preferred Orientation
@@ -271,7 +419,7 @@ The following properties are available:
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The Dimensionless Grain Boundary Sliding (GBS) threshold. This is a grain size threshold below which grain deform by GBS and become strain-free grains.
+**Documentation:** The Dimensionless Grain Boundary Sliding (GBS) threshold. This is a grain size threshold below which grains deform by GBS and become strain-free grains.
 
 (parameters:Particles_202/Crystal_20Preferred_20Orientation/D_2dRex_202004/Volume_20fractions_20minerals)=
 ### __Parameter name:__ Volume fractions minerals
@@ -283,13 +431,21 @@ The following properties are available:
 
 (parameters:Particles_202/Crystal_20Preferred_20Orientation/Initial_20grains)=
 ## **Subsection:** Particles 2 / Crystal Preferred Orientation / Initial grains
+(parameters:Particles_202/Crystal_20Preferred_20Orientation/Initial_20grains/CPX_20RRSS)=
+### __Parameter name:__ CPX RRSS
+**Default value:** 1,5,5,1.5
+
+**Pattern:** [List of <[Anything]> of length 0...4294967295 (inclusive)]
+
+**Documentation:** The default RRSS values for CPX, used in fabric calculations.(preliminary results, pending further investigations).This list expects 4 entries separated by commas.Main slip systems from Bascou et al., 2002 JSG and Zhang et al., 2006 EPSL and from numerical experiments
+
 (parameters:Particles_202/Crystal_20Preferred_20Orientation/Initial_20grains/Minerals)=
 ### __Parameter name:__ Minerals
 **Default value:** Olivine: Karato 2008, Enstatite
 
 **Pattern:** [List of <[Anything]> of length 0...4294967295 (inclusive)]
 
-**Documentation:** This determines what minerals and fabrics or fabric selectors are used used for the LPO/CPO calculation. The options are Olivine: Passive, A-fabric, Olivine: B-fabric, Olivine: C-fabric, Olivine: D-fabric, Olivine: E-fabric, Olivine: Karato 2008 or Enstatite. Passive sets all RRSS entries to the maximum. The Karato 2008 selector selects a fabric based on stress and water content as defined in figure 4 of the Karato 2008 review paper (doi: 10.1146/annurev.earth.36.031207.124120).
+**Documentation:** This determines what minerals and fabrics or fabric selectors are used used for the LPO/CPO calculation. The options are Olivine: Passive, A-fabric, Olivine: B-fabric, Olivine: C-fabric, Olivine: D-fabric, Olivine: E-fabric, Olivine: Karato 2008 or Enstatite or CPX. Passive sets all RRSS entries to the maximum. The Karato 2008 selector selects a fabric based on stress and water content as defined in figure 4 of the Karato 2008 review paper (doi: 10.1146/annurev.earth.36.031207.124120).
 
 (parameters:Particles_202/Crystal_20Preferred_20Orientation/Initial_20grains/Model_20name)=
 ### __Parameter name:__ Model name
@@ -299,13 +455,31 @@ The following properties are available:
 
 **Documentation:** The model used to initialize the CPO for all particles. Currently &rsquo;Uniform grains and random uniform rotations&rsquo; and &rsquo;World Builder&rsquo; are the only valid option.
 
+(parameters:Particles_202/Crystal_20Preferred_20Orientation/Initial_20grains/OlivineD_20RRSS)=
+### __Parameter name:__ OlivineD RRSS
+**Default value:** 3.,5.,1.e60,1.
+
+**Pattern:** [List of <[Anything]> of length 0...4294967295 (inclusive)]
+
+**Documentation:** Alternative RRSS values for Olivine D-type fabric when incorporating slip plane {0kl}, used in fabric calculations.(preliminary results, pending further investigations).This list expects 4 entries separated by commas.Main slip systems from Karato 2008 and Bystricky et al., 2001 and from numerical experiments
+
 (parameters:Particles_202/Crystal_20Preferred_20Orientation/Initial_20grains/Volume_20fractions_20minerals)=
 ### __Parameter name:__ Volume fractions minerals
 **Default value:** 0.7, 0.3
 
 **Pattern:** [List of <[Double 0...MAX_DOUBLE (inclusive)]> of length 0...4294967295 (inclusive)]
 
-**Documentation:** The volume fractions for the different minerals. There need to be the same number of values as there are minerals.Note that the currently implemented scheme is incompressible and does not allow chemical interaction or the formation of new phases
+**Documentation:** The volume fractions for the different minerals. There need to be the same number of values as there are minerals. Note that the currently implemented scheme is incompressible and does not allow chemical interaction or the formation of new phases.
+
+(parameters:Particles_202/Elastic_20stress)=
+## **Subsection:** Particles 2 / Elastic stress
+(parameters:Particles_202/Elastic_20stress/Particle_20stress_20value_20weight)=
+### __Parameter name:__ Particle stress value weight
+**Default value:** 1.0
+
+**Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
+
+**Documentation:** The weight given to the value of the stress tensor components stored on the particles in the weighted average of those values and the values of the compositional fields evaluated on the particle location. The average is used in the Material Model inputs used to compute the reaction rates and to update the particle property with the reaction rates. In some cases, using the field values leads to more stable results.
 
 (parameters:Particles_202/Function)=
 ## **Subsection:** Particles 2 / Function

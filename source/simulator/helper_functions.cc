@@ -20,6 +20,7 @@
 
 
 #include <aspect/simulator.h>
+#include <aspect/advection_field.h>
 #include <aspect/melt.h>
 #include <aspect/volume_of_fluid/handler.h>
 #include <aspect/newton.h>
@@ -36,6 +37,8 @@
 #include <aspect/particle/interpolator/interface.h>
 #include <aspect/particle/property/interface.h>
 #include <aspect/postprocess/visualization.h>
+#include <aspect/prescribed_solution/interface.h>
+#include <aspect/prescribed_stokes_solution/interface.h>
 
 #include <deal.II/base/index_set.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -62,162 +65,6 @@
 
 namespace aspect
 {
-
-  template <int dim>
-  Simulator<dim>::AdvectionField::
-  AdvectionField (const FieldType field_type,
-                  const unsigned int compositional_variable)
-    :
-    field_type (field_type),
-    compositional_variable (compositional_variable)
-  {
-    if (field_type == temperature_field)
-      Assert (compositional_variable == numbers::invalid_unsigned_int,
-              ExcMessage ("You can't specify a compositional variable if you "
-                          "have in fact selected the temperature."));
-  }
-
-
-
-  template <int dim>
-  typename Simulator<dim>::AdvectionField
-  Simulator<dim>::AdvectionField::temperature ()
-  {
-    return AdvectionField(temperature_field);
-  }
-
-
-
-  template <int dim>
-  typename Simulator<dim>::AdvectionField
-  Simulator<dim>::AdvectionField::composition (const unsigned int compositional_variable)
-  {
-    return AdvectionField(compositional_field,
-                          compositional_variable);
-  }
-
-
-  template <int dim>
-  bool
-  Simulator<dim>::AdvectionField::is_temperature() const
-  {
-    return (field_type == temperature_field);
-  }
-
-  template <int dim>
-  bool
-  Simulator<dim>::AdvectionField::is_discontinuous(const Introspection<dim> &introspection) const
-  {
-    if (field_type == temperature_field)
-      return introspection.use_discontinuous_temperature_discretization;
-    else if (field_type == compositional_field)
-      return introspection.use_discontinuous_composition_discretization[compositional_variable];
-
-    Assert (false, ExcInternalError());
-    return false;
-  }
-
-  template <int dim>
-  typename Parameters<dim>::AdvectionFieldMethod::Kind
-  Simulator<dim>::AdvectionField::advection_method(const Introspection<dim> &introspection) const
-  {
-    if (field_type == temperature_field)
-      return introspection.temperature_method;
-    else if (field_type == compositional_field)
-      return introspection.compositional_field_methods[compositional_variable];
-
-    Assert (false, ExcInternalError());
-    return Parameters<dim>::AdvectionFieldMethod::fem_field;
-  }
-
-  template <int dim>
-  unsigned int
-  Simulator<dim>::AdvectionField::block_index(const Introspection<dim> &introspection) const
-  {
-    if (this->is_temperature())
-      return introspection.block_indices.temperature;
-    else
-      return introspection.block_indices.compositional_fields[compositional_variable];
-  }
-
-  template <int dim>
-  unsigned int
-  Simulator<dim>::AdvectionField::sparsity_pattern_block_index(const Introspection<dim> &introspection) const
-  {
-    if (this->is_temperature())
-      return introspection.block_indices.temperature;
-    else
-      return introspection.block_indices.compositional_field_sparsity_pattern[compositional_variable];
-  }
-
-  template <int dim>
-  unsigned int
-  Simulator<dim>::AdvectionField::component_index(const Introspection<dim> &introspection) const
-  {
-    if (this->is_temperature())
-      return introspection.component_indices.temperature;
-    else
-      return introspection.component_indices.compositional_fields[compositional_variable];
-  }
-
-  template <int dim>
-  unsigned int
-  Simulator<dim>::AdvectionField::field_index() const
-  {
-    if (this->is_temperature())
-      return 0;
-    else
-      return compositional_variable + 1;
-  }
-
-  template <int dim>
-  unsigned int
-  Simulator<dim>::AdvectionField::base_element(const Introspection<dim> &introspection) const
-  {
-    if (this->is_temperature())
-      return introspection.base_elements.temperature;
-    else
-      return introspection.base_elements.compositional_fields[compositional_variable];
-  }
-
-  template <int dim>
-  FEValuesExtractors::Scalar
-  Simulator<dim>::AdvectionField::scalar_extractor(const Introspection<dim> &introspection) const
-  {
-    if (this->is_temperature())
-      return introspection.extractors.temperature;
-    else
-      {
-        Assert(compositional_variable < introspection.n_compositional_fields,
-               ExcMessage("Invalid AdvectionField."));
-        return introspection.extractors.compositional_fields[compositional_variable];
-      }
-  }
-
-  template <int dim>
-  unsigned int
-  Simulator<dim>::AdvectionField::polynomial_degree(const Introspection<dim> &introspection) const
-  {
-    if (this->is_temperature())
-      return introspection.polynomial_degree.temperature;
-    else
-      return introspection.polynomial_degree.compositional_fields[compositional_variable];
-  }
-
-
-
-  template <int dim>
-  std::string
-  Simulator<dim>::AdvectionField::name(const Introspection<dim> &introspection) const
-  {
-    if (this->is_temperature())
-      return "temperature";
-    else
-      return "composition " + std::to_string(compositional_variable) + " (" + introspection.name_for_compositional_index(compositional_variable) + ")";
-  }
-
-
-
   template <int dim>
   void Simulator<dim>::write_plugin_graph (std::ostream &out) const
   {
@@ -272,6 +119,7 @@ namespace aspect
     Particle::Property::Manager<dim>::write_plugin_graph(out);
     Postprocess::Manager<dim>::write_plugin_graph(out);
     Postprocess::Visualization<dim>::write_plugin_graph(out);
+    PrescribedSolution::Manager<dim>::write_plugin_graph(out);
     PrescribedStokesSolution::write_plugin_graph<dim>(out);
     TerminationCriteria::Manager<dim>::write_plugin_graph(out);
 
@@ -674,8 +522,8 @@ namespace aspect
 
 
   template <int dim>
-  bool Simulator<dim>::maybe_write_checkpoint (const time_t last_checkpoint_time,
-                                               const bool force_writing_checkpoint)
+  bool Simulator<dim>::maybe_write_checkpoint (const std::time_t last_checkpoint_time,
+                                               const bool        force_writing_checkpoint)
   {
     // Do a checkpoint if this is the end of simulation,
     // and the termination criteria say to checkpoint at the end.
@@ -685,12 +533,11 @@ namespace aspect
     // This prevents race conditions where some processes will checkpoint and others won't
     if (!write_checkpoint && parameters.checkpoint_time_secs > 0)
       {
-        int global_do_checkpoint = ((std::time(nullptr)-last_checkpoint_time) >=
-                                    parameters.checkpoint_time_secs);
-        const int ierr = MPI_Bcast(&global_do_checkpoint, 1, MPI_INT, 0, mpi_communicator);
-        AssertThrowMPI(ierr);
-
-        if (global_do_checkpoint == 1)
+        const bool global_do_checkpoint = Utilities::MPI::broadcast(mpi_communicator,
+                                                                    (std::time(nullptr)-last_checkpoint_time) >=
+                                                                    parameters.checkpoint_time_secs,
+                                                                    /* root= */0);
+        if (global_do_checkpoint)
           write_checkpoint = true;
       }
 
@@ -1696,6 +1543,11 @@ namespace aspect
     tmp.block(block_index) +=  distributed_reaction_vector.block(block_index);
     old_old_solution.block(block_index) = tmp.block(block_index);
 
+    // Same here for the current linearization point.
+    tmp.block(block_index) = current_linearization_point.block(block_index);
+    tmp.block(block_index) +=  distributed_reaction_vector.block(block_index);
+    current_linearization_point.block(block_index) = tmp.block(block_index);
+
     operator_split_reaction_vector.block(block_index) = distributed_reaction_vector.block(block_index);
   }
 
@@ -1755,7 +1607,7 @@ namespace aspect
     if (time_step == 0)
       return;
 
-    TimerOutput::Scope timer (computing_timer, "Solve composition reactions");
+    computing_timer.enter_subsection("Solve composition reactions");
 
     // we need some temporary vectors to store our updates to composition and temperature in
     // while we do the time stepping, before we copy them over to the solution vector in the end
@@ -1795,10 +1647,10 @@ namespace aspect
     std::vector<AdvectionField> advection_fields;
 
     // First add the temperature field
-    advection_fields.push_back(Simulator<dim>::AdvectionField::temperature());
+    advection_fields.push_back(AdvectionField::temperature());
     // Then add all compositional fields
     for (unsigned int c=0; c<introspection.n_compositional_fields; ++c)
-      advection_fields.push_back(Simulator<dim>::AdvectionField::composition(c));
+      advection_fields.push_back(AdvectionField::composition(c));
 
     const unsigned int n_fields = advection_fields.size();
     compute_unique_advection_support_points(advection_fields, unique_support_points, support_point_index_by_field);
@@ -1814,12 +1666,12 @@ namespace aspect
     MaterialModel::MaterialModelInputs<dim> in(n_q_points, introspection.n_compositional_fields);
     MaterialModel::MaterialModelOutputs<dim> out(n_q_points, introspection.n_compositional_fields);
     HeatingModel::HeatingModelOutputs heating_model_outputs(n_q_points, introspection.n_compositional_fields);
-
+    MeltHandler<dim>::create_material_model_outputs(out);
     // add reaction rate outputs
     material_model->create_additional_named_outputs(out);
 
-    MaterialModel::ReactionRateOutputs<dim> *reaction_rate_outputs
-      = out.template get_additional_output<MaterialModel::ReactionRateOutputs<dim>>();
+    const std::shared_ptr<MaterialModel::ReactionRateOutputs<dim>> reaction_rate_outputs
+      = out.template get_additional_output_object<MaterialModel::ReactionRateOutputs<dim>>();
 
     AssertThrow(reaction_rate_outputs != nullptr,
                 ExcMessage("You are trying to use the operator splitting solver scheme, "
@@ -1878,7 +1730,7 @@ namespace aspect
       return;
     };
 
-    auto copy_rates_into_one_vector = [n_q_points,n_fields](const MaterialModel::ReactionRateOutputs<dim> *reaction_out,
+    auto copy_rates_into_one_vector = [n_q_points,n_fields](const MaterialModel::ReactionRateOutputs<dim> &reaction_out,
                                                             const HeatingModel::HeatingModelOutputs &heating_out,
                                                             VectorType &rates)
     {
@@ -1887,7 +1739,7 @@ namespace aspect
           if (f==0)
             rates[j*n_fields+f] = heating_out.rates_of_temperature_change[j];
           else
-            rates[j*n_fields+f] = reaction_out->reaction_rates[j][f-1];
+            rates[j*n_fields+f] = reaction_out.reaction_rates[j][f-1];
       return;
     };
 
@@ -1936,7 +1788,7 @@ namespace aspect
                 material_model->fill_additional_material_model_inputs(in, solution, fe_values, introspection);
                 material_model->evaluate(in, out);
                 heating_model_manager.evaluate(in, out, heating_model_outputs);
-                copy_rates_into_one_vector (reaction_rate_outputs, heating_model_outputs, ydot);
+                copy_rates_into_one_vector (*reaction_rate_outputs, heating_model_outputs, ydot);
               };
 
               // Make the reaction time steps: We have to update the values of compositional fields and the temperature.
@@ -2012,8 +1864,9 @@ namespace aspect
                   const unsigned int point_idx = support_point_index_by_field[field_index][index_within];
 
                   // The final step is grabbing the value from the reaction computation and write it into
-                  // the global vector (if we own it, of course):
-                  if (dof_handler.locally_owned_dofs().is_element(local_dof_indices[dof_idx]))
+                  // the global vector (if we own it and if it is not a constrained degree of freedom).:
+                  if (dof_handler.locally_owned_dofs().is_element(local_dof_indices[dof_idx]) &&
+                      !current_constraints.is_constrained(local_dof_indices[dof_idx]))
                     {
                       // temperatures and compositions are stored differently:
                       if (component_idx == component_idx_T)
@@ -2035,6 +1888,9 @@ namespace aspect
     distributed_vector.compress(VectorOperation::insert);
     distributed_reaction_vector.compress(VectorOperation::insert);
 
+    // Now apply constraints (boundary conditions and others) to the new solution vector.
+    current_constraints.distribute (distributed_vector);
+
     // put the final values into the solution vector
     for (unsigned int c=0; c<introspection.n_compositional_fields; ++c)
       update_solution_vectors_with_reaction_results(introspection.block_indices.compositional_fields[c],
@@ -2044,8 +1900,6 @@ namespace aspect
     update_solution_vectors_with_reaction_results(introspection.block_indices.temperature,
                                                   distributed_vector,
                                                   distributed_reaction_vector);
-
-    initialize_current_linearization_point();
 
     double average_iteration_count = number_of_reaction_steps;
     if (parameters.reaction_solver_type == Parameters<dim>::ReactionSolverType::ARKode)
@@ -2060,6 +1914,8 @@ namespace aspect
           << average_iteration_count
           << " substep(s)."
           << std::endl;
+
+    computing_timer.leave_subsection("Solve composition reactions");
   }
 
 
@@ -2146,10 +2002,10 @@ namespace aspect
     // add the prescribed field outputs that will be used for interpolating
     material_model->create_additional_named_outputs(out);
 
-    MaterialModel::PrescribedFieldOutputs<dim> *prescribed_field_out
-      = out.template get_additional_output<MaterialModel::PrescribedFieldOutputs<dim>>();
-    MaterialModel::PrescribedTemperatureOutputs<dim> *prescribed_temperature_out
-      = out.template get_additional_output<MaterialModel::PrescribedTemperatureOutputs<dim>>();
+    const std::shared_ptr<MaterialModel::PrescribedFieldOutputs<dim>> prescribed_field_out
+      = out.template get_additional_output_object<MaterialModel::PrescribedFieldOutputs<dim>>();
+    const std::shared_ptr<MaterialModel::PrescribedTemperatureOutputs<dim>> prescribed_temperature_out
+      = out.template get_additional_output_object<MaterialModel::PrescribedTemperatureOutputs<dim>>();
 
     // Make a loop first over all cells, and then over all degrees of freedom in each element
     // to interpolate material properties onto a solution vector.
@@ -2336,18 +2192,63 @@ namespace aspect
 
   template <int dim>
   void
-  Simulator<dim>::replace_outflow_boundary_ids(const unsigned int offset)
+  Simulator<dim>::replace_outflow_boundary_ids(const unsigned int offset,
+                                               const bool is_composition,
+                                               const unsigned int composition_index)
   {
     const Quadrature<dim-1> &quadrature_formula = introspection.face_quadratures.temperature;
+
+    bool consider_darcy_velocity = false;
+    bool consider_fluid_velocity = false;
+    unsigned int porosity_idx = numbers::invalid_unsigned_int;
+
+    // Check to see if we are attempting to replace the boundary conditions for the temperature, or for the
+    // composition. If we are attempting to replace the composition boundary conditions, check to see if the current
+    // compositional field is advected with the darcy velocity (via the darcy field advection method) or with the
+    // fluid velocity (via the melt field advection method, or via a compositional field named porosity when melt
+    // transport is included).
+    if (is_composition)
+      {
+        if (introspection.compositional_field_methods[composition_index] == Parameters<dim>::AdvectionFieldMethod::fem_darcy_field)
+          {
+            consider_darcy_velocity = true;
+            porosity_idx = introspection.find_composition_type(CompositionalFieldDescription::porosity);
+          }
+        if (introspection.compositional_field_methods[composition_index] == Parameters<dim>::AdvectionFieldMethod::fem_melt_field ||
+            (parameters.include_melt_transport && introspection.get_indices_for_fields_of_type(CompositionalFieldDescription::porosity)[0] == composition_index) )
+          consider_fluid_velocity = true;
+      }
+
+    // If the compositional field uses the darcy velocity, we need to update the gradients, otherwise we do not
+    const UpdateFlags update_flags
+      = UpdateFlags(
+          consider_darcy_velocity
+          ?
+          update_values |
+          update_gradients |
+          update_normal_vectors |
+          update_quadrature_points |
+          update_JxW_values
+          :
+          update_values |
+          update_normal_vectors |
+          update_quadrature_points |
+          update_JxW_values);
 
     FEFaceValues<dim> fe_face_values (*mapping,
                                       finite_element,
                                       quadrature_formula,
-                                      update_values   | update_normal_vectors |
-                                      update_quadrature_points | update_JxW_values);
+                                      update_flags);
 
     std::vector<Tensor<1,dim>> face_current_velocity_values (fe_face_values.n_quadrature_points);
     std::vector<Tensor<1,dim>> face_current_mesh_velocity_values (fe_face_values.n_quadrature_points);
+    std::vector<Tensor<1,dim>> face_current_fluid_velocity_values (fe_face_values.n_quadrature_points);
+
+    MaterialModel::MaterialModelInputs<dim> in(fe_face_values.n_quadrature_points, introspection.n_compositional_fields);
+    MaterialModel::MaterialModelOutputs<dim> out(fe_face_values.n_quadrature_points, introspection.n_compositional_fields);
+    MeltHandler<dim>::create_material_model_outputs(out);
+    std::shared_ptr<MaterialModel::MeltOutputs<dim>> fluid_out
+      = out.template get_additional_output_object<MaterialModel::MeltOutputs<dim>>();
 
     const auto &tangential_velocity_boundaries =
       boundary_velocity_manager.get_tangential_boundary_velocity_indicators();
@@ -2382,8 +2283,22 @@ namespace aspect
                   fe_face_values[introspection.extractors.velocities].get_function_values(mesh_deformation->mesh_velocity,
                                                                                           face_current_mesh_velocity_values);
 
+                if (consider_darcy_velocity)
+                  {
+                    in.reinit(fe_face_values, cell, introspection, solution);
+                    material_model->evaluate(in, out);
+                    fluid_out = out.template get_additional_output_object<MaterialModel::MeltOutputs<dim>>();
+                  }
+
+                if (consider_fluid_velocity)
+                  {
+                    fe_face_values[introspection.variable("fluid velocity").extractor_vector()].get_function_values(current_linearization_point,
+                        face_current_fluid_velocity_values);
+                  }
+
                 // ... check if the face is an outflow boundary by integrating the normal velocities
                 // (flux through the boundary) as: int u*n ds = Sum_q u(x_q)*n(x_q) JxW(x_q)...
+                // do this for the solid velocity, the darcy velocity, or the fluid velocity.
                 double integrated_flow = 0;
 
                 for (unsigned int q=0; q<fe_face_values.n_quadrature_points; ++q)
@@ -2398,8 +2313,32 @@ namespace aspect
                     if (parameters.mesh_deformation_enabled)
                       boundary_velocity -= face_current_mesh_velocity_values[q];
 
-                    integrated_flow += (boundary_velocity * fe_face_values.normal_vector(q)) *
-                                       fe_face_values.JxW(q);
+                    if (consider_darcy_velocity)
+                      {
+                        const double porosity = std::max(in.composition[q][porosity_idx], 1e-10);
+                        const Tensor<1,dim> gravity = gravity_model->gravity_vector(in.position[q]);
+                        const double solid_density = out.densities[q];
+                        const double fluid_viscosity = fluid_out->fluid_viscosities[q];
+                        const double fluid_density = fluid_out->fluid_densities[q];
+                        const double permeability = fluid_out->permeabilities[q];
+                        const Tensor<1,dim> boundary_darcy_velocity = boundary_velocity -
+                                                                      permeability / fluid_viscosity / porosity * gravity *
+                                                                      (solid_density - fluid_density);
+                        integrated_flow += (boundary_darcy_velocity * fe_face_values.normal_vector(q)) *
+                                           fe_face_values.JxW(q);
+                      }
+
+                    else if (consider_fluid_velocity)
+                      {
+                        integrated_flow += (face_current_fluid_velocity_values[q] * fe_face_values.normal_vector(q)) *
+                                           fe_face_values.JxW(q);
+                      }
+
+                    else
+                      {
+                        integrated_flow += (boundary_velocity * fe_face_values.normal_vector(q)) *
+                                           fe_face_values.JxW(q);
+                      }
                   }
 
                 // ... and change the boundary id of any outflow boundary faces.
@@ -2548,6 +2487,46 @@ namespace aspect
                              "> is listed as having more "
                              "than one type of temperature or heat flux boundary condition in the input file."));
 
+    // are there any indicators that occur in both the prescribed temperature and convective heating list?
+    std::set<types::boundary_id> Tc_intersection;
+    std::set_intersection (boundary_temperature_manager.get_fixed_temperature_boundary_indicators().begin(),
+                           boundary_temperature_manager.get_fixed_temperature_boundary_indicators().end(),
+                           boundary_convective_heating_manager.get_fixed_convective_heating_boundary_indicators().begin(),
+                           boundary_convective_heating_manager.get_fixed_convective_heating_boundary_indicators().end(),
+                           std::inserter(Tc_intersection, Tc_intersection.end()));
+
+    AssertThrow (Tc_intersection.empty(),
+                 ExcMessage ("Boundary indicator <"
+                             +
+                             Utilities::int_to_string(*Tc_intersection.begin())
+                             +
+                             "> with symbolic name <"
+                             +
+                             geometry_model->translate_id_to_symbol_name (*Tc_intersection.begin())
+                             +
+                             "> is listed as having more "
+                             "than one type of temperature or convective heating boundary condition in the input file."));
+
+    // are there any indicators that occur in both the prescribed heat flux and convective heating list?
+    std::set<types::boundary_id> Tflux_intersection;
+    std::set_intersection (parameters.fixed_heat_flux_boundary_indicators.begin(),
+                           parameters.fixed_heat_flux_boundary_indicators.end(),
+                           boundary_convective_heating_manager.get_fixed_convective_heating_boundary_indicators().begin(),
+                           boundary_convective_heating_manager.get_fixed_convective_heating_boundary_indicators().end(),
+                           std::inserter(Tflux_intersection, Tflux_intersection.end()));
+
+    AssertThrow (Tflux_intersection.empty(),
+                 ExcMessage ("Boundary indicator <"
+                             +
+                             Utilities::int_to_string(*Tflux_intersection.begin())
+                             +
+                             "> with symbolic name <"
+                             +
+                             geometry_model->translate_id_to_symbol_name (*Tflux_intersection.begin())
+                             +
+                             "> is listed as having more "
+                             "than one type of heat flux or convective heating boundary condition in the input file."));
+
     boundary_indicator_lists.emplace_back(boundary_composition_manager.get_fixed_composition_boundary_indicators());
 
     // Check that the periodic boundaries do not have other boundary conditions set
@@ -2601,14 +2580,15 @@ namespace aspect
                                  +
                                  "> is listed for a boundary condition, but is not used by the geometry model."));
 
-    if (parameters.nonlinear_solver == NonlinearSolver::single_Advection_no_Stokes)
+    if (parameters.nonlinear_solver == NonlinearSolver::single_Advection_no_Stokes ||
+        parameters.nonlinear_solver == NonlinearSolver::iterated_Advection_no_Stokes)
       {
         // make sure that there are no listed velocity boundary conditions
         for (unsigned int i=0; i<4; ++i)
           AssertThrow (boundary_indicator_lists[i].empty(),
-                       ExcMessage ("With the solver scheme `single Advection, no Stokes', "
-                                   "one cannot set boundary conditions for velocity or traction, "
-                                   "but a boundary condition has been set."));
+                       ExcMessage ("With the solver schemes `single Advection, no Stokes' or "
+                                   "'iterated Advection, no Stokes' one cannot set boundary conditions "
+                                   "for velocity or traction, but a boundary condition has been set."));
       }
   }
 
@@ -2720,6 +2700,7 @@ namespace aspect
         //   - Periodic boundaries
         //   - Stokes velocity degree not 2 or 3
         //   - Material averaging explicitly disabled
+        //   - Robin boundary conditions
         if (parameters.include_melt_transport == true ||
             dynamic_cast<const GeometryModel::EllipsoidalChunk<dim>*>(geometry_model.get()) != nullptr ||
             parameters.use_locally_conservative_discretization == true ||
@@ -2727,7 +2708,8 @@ namespace aspect
              Parameters<dim>::Formulation::MassConservation::implicit_reference_density_profile) ||
             (geometry_model->get_periodic_boundary_pairs().size()) > 0 ||
             (parameters.stokes_velocity_degree < 2 || parameters.stokes_velocity_degree > 3) ||
-            parameters.material_averaging == MaterialModel::MaterialAveraging::none)
+            parameters.material_averaging == MaterialModel::MaterialAveraging::none ||
+            boundary_convective_heating_manager.get_fixed_convective_heating_boundary_indicators().size() != 0)
           {
             // GMG is not supported (yet), by default fall back to AMG.
             parameters.stokes_solver_type = Parameters<dim>::StokesSolverType::block_amg;
@@ -2764,7 +2746,6 @@ namespace aspect
 namespace aspect
 {
 #define INSTANTIATE(dim) \
-  template struct Simulator<dim>::AdvectionField; \
   template double Simulator<dim>::normalize_pressure(LinearAlgebra::BlockVector &vector) const; \
   template void Simulator<dim>::denormalize_pressure(const double pressure_adjustment, \
                                                      LinearAlgebra::BlockVector &vector) const; \
@@ -2772,7 +2753,7 @@ namespace aspect
   template double Simulator<dim>::get_maximal_velocity (const LinearAlgebra::BlockVector &solution) const; \
   template std::pair<double,double> Simulator<dim>::get_extrapolated_advection_field_range (const AdvectionField &advection_field) const; \
   template void Simulator<dim>::maybe_write_timing_output () const; \
-  template bool Simulator<dim>::maybe_write_checkpoint (const time_t, const bool); \
+  template bool Simulator<dim>::maybe_write_checkpoint (const std::time_t, const bool); \
   template bool Simulator<dim>::maybe_do_initial_refinement (const unsigned int max_refinement_level); \
   template void Simulator<dim>::exchange_refinement_flags (); \
   template void Simulator<dim>::maybe_refine_mesh (const double new_time_step, unsigned int &max_refinement_level); \
@@ -2792,7 +2773,9 @@ namespace aspect
   template void Simulator<dim>::initialize_current_linearization_point (); \
   template void Simulator<dim>::interpolate_material_output_into_advection_field(const std::vector<AdvectionField> &adv_field); \
   template void Simulator<dim>::check_consistency_of_formulation(); \
-  template void Simulator<dim>::replace_outflow_boundary_ids(const unsigned int boundary_id_offset); \
+  template void Simulator<dim>::replace_outflow_boundary_ids(const unsigned int boundary_id_offset, \
+                                                             const bool is_composition, \
+                                                             const unsigned int composition_index); \
   template void Simulator<dim>::restore_outflow_boundary_ids(const unsigned int boundary_id_offset); \
   template void Simulator<dim>::check_consistency_of_boundary_conditions() const; \
   template double Simulator<dim>::compute_initial_newton_residual(); \

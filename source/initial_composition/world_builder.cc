@@ -20,15 +20,17 @@
 
 #include <aspect/global.h>
 
-#ifdef ASPECT_WITH_WORLD_BUILDER
 #include <aspect/initial_composition/world_builder.h>
 #include <aspect/geometry_model/interface.h>
 
+#ifdef ASPECT_WITH_WORLD_BUILDER
 #include <world_builder/world.h>
+#endif
 
 
 namespace aspect
 {
+#ifdef ASPECT_WITH_WORLD_BUILDER
   namespace InitialComposition
   {
     template <int dim>
@@ -131,5 +133,5 @@ namespace aspect
                                               "the World Builder only for selected compositional fields by "
                                               "specifying the parameter 'List of relevant compositions'.")
   }
-}
 #endif
+}

@@ -48,7 +48,7 @@ namespace aspect
       public:
         PlasticAdditionalOutputs2(const unsigned int n_points);
 
-        virtual std::vector<double> get_nth_output(const unsigned int idx) const;
+        virtual std::vector<double> get_nth_output(const unsigned int idx) const override;
 
         /**
          * Cohesions at the evaluation points passed to
@@ -112,7 +112,8 @@ namespace aspect
                       typename Interface<dim>::MaterialModelOutputs &out) const override;
 
         virtual void melt_fractions (const MaterialModel::MaterialModelInputs<dim> &in,
-                                     std::vector<double> &melt_fractions) const;
+                                     std::vector<double> &melt_fractions,
+                                     const MaterialModel::MaterialModelOutputs<dim> *out = nullptr) const override;
 
         /**
          * @}
@@ -134,7 +135,7 @@ namespace aspect
          */
         virtual
         void
-        parse_parameters (ParameterHandler &prm);
+        parse_parameters (ParameterHandler &prm) override;
         /**
          * @}
          */
@@ -354,7 +355,8 @@ namespace aspect
     void
     MeltViscoPlastic<dim>::
     melt_fractions (const MaterialModel::MaterialModelInputs<dim> &in,
-                    std::vector<double> &melt_fractions) const
+                    std::vector<double> &melt_fractions,
+                    const MaterialModel::MaterialModelOutputs<dim> *) const
     {
       for (unsigned int q=0; q<in.n_evaluation_points(); ++q)
         melt_fractions[q] = melt_fraction(in.temperature[q],
@@ -392,7 +394,8 @@ namespace aspect
       std::vector<double> volumetric_strain_rates(in.n_evaluation_points());
       std::vector<double> volumetric_yield_strength(in.n_evaluation_points());
 
-      ReactionRateOutputs<dim> *reaction_rate_out = out.template get_additional_output<ReactionRateOutputs<dim>>();
+      const std::shared_ptr<ReactionRateOutputs<dim>> reaction_rate_out
+        = out.template get_additional_output_object<ReactionRateOutputs<dim>>();
 
       if (this->include_melt_transport() )
         {
@@ -486,7 +489,7 @@ namespace aspect
             }
         }
 
-      if (in.requests_property(MaterialProperties::viscosity) )
+      if (in.requests_property(MaterialProperties::viscosity) || in.requests_property(MaterialProperties::additional_outputs))
         {
           // 5) Compute plastic weakening of the viscosity
           for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
@@ -566,7 +569,8 @@ namespace aspect
               const double cohesion = MaterialUtilities::average_value(volume_fractions, cohesions, viscosity_averaging);
               const double angle_internal_friction = MaterialUtilities::average_value(volume_fractions, angles_internal_friction, viscosity_averaging);
 
-              PlasticAdditionalOutputs2<dim> *plastic_out = out.template get_additional_output<PlasticAdditionalOutputs2<dim>>();
+              const std::shared_ptr<PlasticAdditionalOutputs2<dim>> plastic_out
+                = out.template get_additional_output_object<PlasticAdditionalOutputs2<dim>>();
               if (plastic_out != nullptr)
                 {
                   plastic_out->cohesions[i] = cohesion;
@@ -583,9 +587,10 @@ namespace aspect
         }
 
       // fill melt outputs if they exist
-      MeltOutputs<dim> *melt_out = out.template get_additional_output<MeltOutputs<dim>>();
+      const std::shared_ptr<MeltOutputs<dim>> melt_out
+        = out.template get_additional_output_object<MeltOutputs<dim>>();
 
-      if (melt_out != nullptr)
+      if (melt_out != nullptr && in.requests_property(MaterialProperties::additional_outputs))
         {
           for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
             {
@@ -614,7 +619,7 @@ namespace aspect
 
               // effective compaction viscosity (Keller et al. eq (43) )
               // NB: I've added a minus sign as according to eq 43
-              if (in.strain_rate.size() && compaction_pressure < volumetric_yield_strength[i])
+              if (compaction_pressure < volumetric_yield_strength[i])
                 {
                   // the volumetric strain rate might be negative, but will always have the same sign as the volumetric yield strength
                   if (volumetric_strain_rates[i] >= 0)
@@ -771,7 +776,7 @@ namespace aspect
                              "Also note that the melting time scale has to be larger than or equal to the reaction "
                              "time step used in the operator splitting scheme, otherwise reactions can not be "
                              "computed. "
-                             "Units: yr or s, depending on the ``Use years in output instead of seconds'' parameter.");
+                             "Units: yr or s, depending on the ``Use years instead of seconds'' parameter.");
 
           prm.declare_entry ("A1", "1085.7",
                              Patterns::Double (),
@@ -1004,7 +1009,7 @@ namespace aspect
     void
     MeltViscoPlastic<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
     {
-      if (out.template get_additional_output<PlasticAdditionalOutputs2<dim>>() == nullptr)
+      if (out.template has_additional_output_object<PlasticAdditionalOutputs2<dim>>() == false)
         {
           const unsigned int n_points = out.n_evaluation_points();
           out.additional_outputs.push_back(

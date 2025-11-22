@@ -139,7 +139,7 @@ Make sure the top and bottom temperatures of the lithosphere agree with temperat
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The age of the lower thermal boundary layer, used for the calculation of the half-space cooling model temperature. Units: years if the &rsquo;Use years in output instead of seconds&rsquo; parameter is set; seconds otherwise.
+**Documentation:** The age of the lower thermal boundary layer, used for the calculation of the half-space cooling model temperature. Units: years if the &rsquo;Use years instead of seconds&rsquo; parameter is set; seconds otherwise.
 
 (parameters:Initial_20temperature_20model/Adiabatic/Age_20top_20boundary_20layer)=
 ### __Parameter name:__ Age top boundary layer
@@ -147,7 +147,7 @@ Make sure the top and bottom temperatures of the lithosphere agree with temperat
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The age of the upper thermal boundary layer, used for the calculation of the half-space cooling model temperature. Units: years if the &rsquo;Use years in output instead of seconds&rsquo; parameter is set; seconds otherwise.
+**Documentation:** The age of the upper thermal boundary layer, used for the calculation of the half-space cooling model temperature. Units: years if the &rsquo;Use years instead of seconds&rsquo; parameter is set; seconds otherwise.
 
 (parameters:Initial_20temperature_20model/Adiabatic/Amplitude)=
 ### __Parameter name:__ Amplitude
@@ -219,7 +219,7 @@ Make sure the top and bottom temperatures of the lithosphere agree with temperat
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** If this value is larger than 0, the initial temperature profile will not be adiabatic, but subadiabatic. This value gives the maximal deviation from adiabaticity. Set to 0 for an adiabatic temperature profile. Units: \si{\kelvin}.
+**Documentation:** If this value is larger than 0, the initial temperature profile will not be adiabatic, but subadiabatic. This value gives the maximal deviation from adiabaticity. Set to 0 for an adiabatic temperature profile. Units: $\text{K}$.
 
 The function object in the Function subsection represents the compositional fields that will be used as a reference profile for calculating the thermal diffusivity. This function is one-dimensional and depends only on depth. The format of this functions follows the syntax understood by the muparser library, see {ref}`sec:run-aspect:parameters-overview:muparser-format`.
 
@@ -331,7 +331,7 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The value of the isothermal boundary temperature. Units: \si{\kelvin}.
+**Documentation:** The value of the isothermal boundary temperature. Units: $\text{K}$.
 
 (parameters:Initial_20temperature_20model/Adiabatic_20boundary/Scale_20factor)=
 ### __Parameter name:__ Scale factor
@@ -347,7 +347,7 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The value of the surface temperature. Units: \si{\kelvin}.
+**Documentation:** The value of the surface temperature. Units: $\text{K}$.
 
 (parameters:Initial_20temperature_20model/Ascii_20data_20model)=
 ## **Subsection:** Initial temperature model / Ascii data model
@@ -457,7 +457,7 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The value of the isotherm that is assumed at the Lithosphere-Asthenosphere boundary. Units: \si{\kelvin}.
+**Documentation:** The value of the isotherm that is assumed at the Lithosphere-Asthenosphere boundary. Units: $\text{K}$.
 
 (parameters:Initial_20temperature_20model/Continental_20geotherm/Surface_20temperature)=
 ### __Parameter name:__ Surface temperature
@@ -465,7 +465,7 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The value of the surface temperature. Units: \si{\kelvin}.
+**Documentation:** The value of the surface temperature. Units: $\text{K}$.
 
 (parameters:Initial_20temperature_20model/Function)=
 ## **Subsection:** Initial temperature model / Function
@@ -715,7 +715,7 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The maximum magnitude of the Gaussian perturbation. For each perturbation, a random magnitude between plus and minus the maximum magnitude will be chosen. Units: \si{\kelvin}.
+**Documentation:** The maximum magnitude of the Gaussian perturbation. For each perturbation, a random magnitude between plus and minus the maximum magnitude will be chosen. Units: $\text{K}$.
 
 (parameters:Initial_20temperature_20model/Random_20Gaussian_20perturbation/Number_20of_20perturbations)=
 ### __Parameter name:__ Number of perturbations
@@ -805,7 +805,7 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The value of the thermal expansion coefficient $\beta$. Units: \si{\per\kelvin}.
+**Documentation:** The value of the thermal expansion coefficient $\beta$. Units: $\frac{1}{\text{K}}$.
 
 (parameters:Initial_20temperature_20model/S40RTS_20perturbation/Use_20thermal_20expansion_20coefficient_20from_20material_20model)=
 ### __Parameter name:__ Use thermal expansion coefficient from material model
@@ -929,7 +929,7 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** The value of the thermal expansion coefficient $\beta$. Units: \si{\per\kelvin}.
+**Documentation:** The value of the thermal expansion coefficient $\beta$. Units: $\frac{1}{\text{K}}$.
 
 (parameters:Initial_20temperature_20model/SAVANI_20perturbation/Use_20thermal_20expansion_20coefficient_20from_20material_20model)=
 ### __Parameter name:__ Use thermal expansion coefficient from material model

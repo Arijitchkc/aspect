@@ -26,7 +26,6 @@
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 
-#include <cstdio>
 #include <unistd.h>
 
 namespace aspect
@@ -157,7 +156,7 @@ namespace aspect
       if (tmp_filename != filename)
         {
           std::string command = std::string("mv ") + tmp_filename + " " + filename;
-          int error = system(command.c_str());
+          int error = std::system(command.c_str());
 
           AssertThrow(error == 0,
                       ExcMessage("Could not move " + tmp_filename + " to "
@@ -207,7 +206,7 @@ namespace aspect
 
       // If it's not time to generate an output file or we do not write output
       // return early.
-      if (this->get_time() < last_output_time + output_interval && this->get_time() != end_time)
+      if (this->get_time() < last_output_time + output_interval && this->get_time() != this->get_end_time())
         return std::make_pair("","");
 
       if (output_file_number == numbers::invalid_unsigned_int)
@@ -607,6 +606,54 @@ namespace aspect
 
 
     template <int dim>
+    template <class Archive>
+    void CrystalPreferredOrientation<dim>::serialize (Archive &ar, const unsigned int)
+    {
+      ar &last_output_time
+      & output_file_number
+      & times_and_pvtu_file_names
+      & output_file_names_by_timestep
+      & xdmf_entries
+      ;
+    }
+
+
+
+    template <int dim>
+    void
+    CrystalPreferredOrientation<dim>::save (std::map<std::string, std::string> &status_strings) const
+    {
+      // Serialize into a stringstream. Put the following into a code
+      // block of its own to ensure the destruction of the 'oa'
+      // archive triggers a flush() on the stringstream so we can
+      // query the completed string below.
+      std::ostringstream os;
+      {
+        aspect::oarchive oa (os);
+
+        oa << (*this);
+      }
+
+      status_strings["Crystal Preferred Orientation"] = os.str();
+    }
+
+
+    template <int dim>
+    void
+    CrystalPreferredOrientation<dim>::load (const std::map<std::string, std::string> &status_strings)
+    {
+      // see if something was saved
+      if (status_strings.find("Crystal Preferred Orientation") != status_strings.end())
+        {
+          std::istringstream is (status_strings.find("Crystal Preferred Orientation")->second);
+          aspect::iarchive ia (is);
+
+          ia >> (*this);
+        }
+    }
+
+
+    template <int dim>
     void
     CrystalPreferredOrientation<dim>::declare_parameters (ParameterHandler &prm)
     {
@@ -620,7 +667,7 @@ namespace aspect
                              "output files. A value of zero indicates that "
                              "output should be generated every time step.\n\n"
                              "Units: years if the "
-                             "'Use years in output instead of seconds' parameter is set; "
+                             "'Use years instead of seconds' parameter is set; "
                              "seconds otherwise.");
 
           prm.declare_entry ("Random number seed", "1",
@@ -695,10 +742,6 @@ namespace aspect
     void
     CrystalPreferredOrientation<dim>::parse_parameters (ParameterHandler &prm)
     {
-      end_time = prm.get_double ("End time");
-      if (this->convert_output_to_years())
-        end_time *= year_in_seconds;
-
       unsigned int n_minerals;
 
       prm.enter_subsection("Particles");
@@ -743,7 +786,7 @@ namespace aspect
               // null pointer. System is guaranteed to return non-zero if it finds
               // a terminal and zero if there is none (like on the compute nodes of
               // some cluster architectures, e.g. IBM BlueGene/Q)
-              AssertThrow(system((char *)nullptr) != 0,
+              AssertThrow(std::system((char *)nullptr) != 0,
                           ExcMessage("Usage of a temporary storage location is only supported if "
                                      "there is a terminal available to move the files to their final location "
                                      "after writing. The system() command did not succeed in finding such a terminal."));
@@ -863,11 +906,11 @@ namespace aspect
   {
     ASPECT_REGISTER_POSTPROCESSOR(CrystalPreferredOrientation,
                                   "crystal preferred orientation",
-                                  "A Postprocessor that writes out CPO specific particle data."
-                                  "It can write out the CPO data as it is stored (raw) and/or as a"
-                                  "random draw volume weighted representation. The latter one"
-                                  "is recommended for plotting against real data. For both representations"
-                                  "the specific output fields and their order can be set."
+                                  "A Postprocessor that writes out CPO specific particle data. "
+                                  "It can write out the CPO data as it is stored (raw) and/or as a "
+                                  "random draw volume weighted representation. The latter one "
+                                  "is recommended for plotting against real data. For both representations "
+                                  "the specific output fields and their order can be set. "
                                   "The work of this postprocessor should better be done by the main particles "
                                   "postprocessor, however we need to be able to process the data before outputting it, "
                                   "which does not work with that postprocessor. If this is added to the other "

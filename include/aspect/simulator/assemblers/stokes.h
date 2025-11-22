@@ -40,6 +40,8 @@ namespace aspect
         void
         execute(internal::Assembly::Scratch::ScratchBase<dim>   &scratch_base,
                 internal::Assembly::CopyData::CopyDataBase<dim> &data_base) const override;
+
+        void create_additional_material_model_outputs(MaterialModel::MaterialModelOutputs<dim> &outputs) const override;
     };
 
     /**
@@ -76,7 +78,7 @@ namespace aspect
     };
 
     /**
-     * This class assembles the term that arises in the viscosity term of Stokes matrix for
+     * This class assembles the term that arises in the viscosity term of the Stokes matrix for
      * compressible models, because the divergence of the velocity is not longer zero.
      */
     template <int dim>

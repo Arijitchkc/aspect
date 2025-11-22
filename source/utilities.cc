@@ -36,7 +36,6 @@
 #include <deal.II/base/table.h>
 #include <deal.II/base/table_indices.h>
 #include <deal.II/base/function_lib.h>
-#include <deal.II/base/exceptions.h>
 #include <deal.II/base/signaling_nan.h>
 #include <deal.II/base/patterns.h>
 #include <deal.II/grid/grid_tools.h>
@@ -48,6 +47,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <regex>
+#include <random>
 
 #include <boost/math/special_functions/spherical_harmonic.hpp>
 #include <boost/lexical_cast.hpp>
@@ -63,154 +63,6 @@ namespace aspect
    */
   namespace Utilities
   {
-    namespace internal
-    {
-      namespace MPI
-      {
-        // --------------------------------------------------------------------
-        // The following is copied from deal.II's mpi.templates.h file.
-        // We should instead import it from deal.II's header files directly
-        // if that information is made available via one of the existing .h
-        // files.
-        // --------------------------------------------------------------------
-#ifdef DEAL_II_WITH_MPI
-        /**
-         * Return the corresponding MPI data type id for the argument given.
-         */
-        inline MPI_Datatype
-        mpi_type_id(const bool *)
-        {
-          return MPI_CXX_BOOL;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const char *)
-        {
-          return MPI_CHAR;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const signed char *)
-        {
-          return MPI_SIGNED_CHAR;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const short *)
-        {
-          return MPI_SHORT;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const int *)
-        {
-          return MPI_INT;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const long int *)
-        {
-          return MPI_LONG;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const unsigned char *)
-        {
-          return MPI_UNSIGNED_CHAR;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const unsigned short *)
-        {
-          return MPI_UNSIGNED_SHORT;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const unsigned int *)
-        {
-          return MPI_UNSIGNED;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const unsigned long int *)
-        {
-          return MPI_UNSIGNED_LONG;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const unsigned long long int *)
-        {
-          return MPI_UNSIGNED_LONG_LONG;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const float *)
-        {
-          return MPI_FLOAT;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const double *)
-        {
-          return MPI_DOUBLE;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const long double *)
-        {
-          return MPI_LONG_DOUBLE;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const std::complex<float> *)
-        {
-          return MPI_COMPLEX;
-        }
-
-
-
-        inline MPI_Datatype
-        mpi_type_id(const std::complex<double> *)
-        {
-          return MPI_DOUBLE_COMPLEX;
-        }
-#endif
-      }
-    }
-
-
-
-
-
-
     template <typename T>
     Table<2,T>
     parse_input_table (const std::string &input_string,
@@ -1505,14 +1357,12 @@ namespace aspect
               filesize = data_string.size();
 
 #else // ASPECT_WITH_LIBDAP
+              // We got a URL but we don't have libDAP. That's an error.
 
               // Broadcast failure state, then throw. We signal the failure by
               // setting the file size to an invalid size, then trigger an assert.
-              {
-                std::size_t invalid_filesize = numbers::invalid_size_type;
-                const int ierr = MPI_Bcast(&invalid_filesize, 1, Utilities::internal::MPI::mpi_type_id(&filesize), 0, comm);
-                AssertThrowMPI(ierr);
-              }
+              const std::size_t invalid_filesize = numbers::invalid_size_type;
+              std::ignore = Utilities::MPI::broadcast (comm, invalid_filesize, 0);
               AssertThrow(false,
                           ExcMessage(std::string("Reading of file ") + filename + " failed. " +
                                      "Make sure you have the dependencies for reading a url " +
@@ -1520,7 +1370,7 @@ namespace aspect
 
 #endif // ASPECT_WITH_LIBDAP
             }
-          else
+          else // we have a regular file name
             {
               std::ifstream filestream;
               const bool filename_ends_in_gz = std::regex_search(filename, std::regex("\\.gz$"));
@@ -1532,9 +1382,8 @@ namespace aspect
               if (!filestream)
                 {
                   // broadcast failure state, then throw
-                  std::size_t invalid_filesize = numbers::invalid_size_type;
-                  const int ierr = MPI_Bcast(&invalid_filesize, 1, Utilities::internal::MPI::mpi_type_id(&filesize), 0, comm);
-                  AssertThrowMPI(ierr);
+                  const std::size_t invalid_filesize = numbers::invalid_size_type;
+                  std::ignore = Utilities::MPI::broadcast (comm, invalid_filesize, 0);
                   AssertThrow (false,
                                ExcMessage (std::string("Could not open file <") + filename + ">."));
                 }
@@ -1554,9 +1403,8 @@ namespace aspect
               catch (const std::ios::failure &)
                 {
                   // broadcast failure state, then throw
-                  std::size_t invalid_filesize = numbers::invalid_size_type;
-                  const int ierr = MPI_Bcast(&invalid_filesize, 1, Utilities::internal::MPI::mpi_type_id(&filesize), 0, comm);
-                  AssertThrowMPI(ierr);
+                  const std::size_t invalid_filesize = numbers::invalid_size_type;
+                  std::ignore = Utilities::MPI::broadcast (comm, invalid_filesize, 0);
                   AssertThrow (false,
                                ExcMessage (std::string("Could not read file content from <") + filename + ">."));
                 }
@@ -1566,17 +1414,14 @@ namespace aspect
             }
 
           // Distribute data_size and data across processes
-          int ierr = MPI_Bcast(&filesize, 1, Utilities::internal::MPI::mpi_type_id(&filesize), 0, comm);
-          AssertThrowMPI(ierr);
+          std::ignore = Utilities::MPI::broadcast (comm, filesize, 0);
 
           big_mpi::broadcast(&data_string[0], filesize, 0, comm);
         }
       else
         {
           // Prepare for receiving data
-          std::size_t filesize;
-          int ierr = MPI_Bcast(&filesize, 1, Utilities::internal::MPI::mpi_type_id(&filesize), 0, comm);
-          AssertThrowMPI(ierr);
+          const std::size_t filesize = Utilities::MPI::broadcast (comm, /* dummy = */ std::size_t(), 0);
           if (filesize == numbers::invalid_size_type)
             throw QuietException();
 
@@ -1610,16 +1455,15 @@ namespace aspect
               for (const auto &content : collected_content)
                 filestream << content;
 
-              bool success = filestream.good();
-              const int ierr = MPI_Bcast(&success, 1, Utilities::internal::MPI::mpi_type_id(&success), 0, comm);
-              AssertThrowMPI(ierr);
+              // We are only reading on process 0. Whether or not that succeeded is something
+              // we need to let the other processes know:
+              std::ignore = Utilities::MPI::broadcast (comm, static_cast<bool>(filestream.good()), 0);
             }
           catch (const std::ios::failure &)
             {
-              // broadcast failure state, then throw
-              bool success = false;
-              const int ierr = MPI_Bcast(&success, 1, Utilities::internal::MPI::mpi_type_id(&success), 0, comm);
-              AssertThrowMPI(ierr);
+              // If reading failed altogether, we may not even have gotten to the broadcast
+              // call above. In that case, broadcast the failure state, then throw.
+              std::ignore = Utilities::MPI::broadcast (comm, false, 0);
               AssertThrow (false,
                            ExcMessage (std::string("Could not write content to file <") + filename + ">."));
             }
@@ -1628,10 +1472,8 @@ namespace aspect
         }
       else
         {
-          // Check that the file was written successfully
-          bool success;
-          int ierr = MPI_Bcast(&success, 1, Utilities::internal::MPI::mpi_type_id(&success), 0, comm);
-          AssertThrowMPI(ierr);
+          // On the other processes, receive process 0's broadcast of its result state:
+          const bool success = Utilities::MPI::broadcast (comm, /* dummy= */ bool(), 0);
           if (success == false)
             throw QuietException();
         }
@@ -1699,8 +1541,7 @@ namespace aspect
               error = closedir(output_directory);
             }
           // Broadcast error code
-          const int ierr = MPI_Bcast (&error, 1, MPI_INT, 0, comm);
-          AssertThrowMPI(ierr);
+          std::ignore = Utilities::MPI::broadcast (comm, error, 0);
           AssertThrow (error == 0,
                        ExcMessage (std::string("Can't create the output directory at <") + pathname + ">"));
         }
@@ -1708,8 +1549,7 @@ namespace aspect
         {
           // Wait to receive error code, and throw QuietException if directory
           // creation has failed
-          const int ierr = MPI_Bcast (&error, 1, MPI_INT, 0, comm);
-          AssertThrowMPI(ierr);
+          error = Utilities::MPI::broadcast (comm, /* dummy= */ decltype(error)(), 0);
           if (error!=0)
             throw aspect::QuietException();
         }
@@ -2937,46 +2777,8 @@ namespace aspect
     (const unsigned int n_components,
      const std::function<Tensor<1,dim> (const Point<dim> &)> &function_object)
       :
-      Function<dim>(n_components),
-      function_object (function_object)
+      VectorFunctionFromTensorFunctionObject<dim>(function_object, 0, n_components)
     {
-    }
-
-
-
-    template <int dim>
-    double
-    VectorFunctionFromVelocityFunctionObject<dim>::value (const Point<dim> &p,
-                                                          const unsigned int component) const
-    {
-      Assert (component < this->n_components,
-              ExcIndexRange (component, 0, this->n_components));
-
-      if (component < dim)
-        {
-          const Tensor<1,dim> v = function_object(p);
-          return v[component];
-        }
-      else
-        return 0;
-    }
-
-
-
-    template <int dim>
-    void
-    VectorFunctionFromVelocityFunctionObject<dim>::
-    vector_value (const Point<dim>   &p,
-                  Vector<double>     &values) const
-    {
-      AssertDimension(values.size(), this->n_components);
-
-      // set everything to zero, and then the right components to their correct values
-      values = 0;
-
-      const Tensor<1,dim> v = function_object(p);
-      for (unsigned int d=0; d<dim; ++d)
-        values(d) = v[d];
     }
 
 
@@ -3010,9 +2812,9 @@ namespace aspect
           if (output_filename != "")
             {
               // output solver history
-              std::ofstream f((output_filename));
+              std::ofstream f(output_filename);
 
-              for (const auto &solver_control: solver_controls)
+              for (const auto &solver_control : solver_controls)
                 {
                   // Skip the output if no iterations were run for this solver
                   if (solver_control.last_step() == numbers::invalid_unsigned_int)
@@ -3023,7 +2825,7 @@ namespace aspect
                     f << std::endl;
 
                   unsigned int j=0;
-                  for (const auto &residual: solver_control.get_history_data())
+                  for (const auto &residual : solver_control.get_history_data())
                     f << j++ << ' ' << residual << std::endl;
                 }
 

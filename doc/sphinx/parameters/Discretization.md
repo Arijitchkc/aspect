@@ -137,7 +137,7 @@ For an in-depth discussion of these issues and a quantitative evaluation of the 
 
 **Pattern:** [Selection entropy viscosity|SUPG ]
 
-**Documentation:** Select the method for stabilizing the advection equation. The original method implemented is &rsquo;entropy viscosity&rsquo; as described in \cite {kronbichler:etal:2012}. SUPG is currently experimental.
+**Documentation:** Select the method for stabilizing the advection equation. The original method implemented is &rsquo;entropy viscosity&rsquo; as described in {cite}`kronbichler:etal:2012`. SUPG is currently experimental.
 
 (parameters:Discretization/Stabilization_20parameters/Use_20artificial_20viscosity_20smoothing)=
 ### __Parameter name:__ Use artificial viscosity smoothing
@@ -177,7 +177,7 @@ For an in-depth discussion of these issues and a quantitative evaluation of the 
 
 **Pattern:** [List of <[Double 0...MAX_DOUBLE (inclusive)]> of length 0...4294967295 (inclusive)]
 
-**Documentation:** The $\beta$ factor in the artificial viscosity stabilization. This parameter controls the maximum dissipation of the entropy viscosity, which is the part that only scales with the cell diameter and the maximum velocity in the cell, but does not depend on the solution field itself or its residual. An appropriate value for 2d is 0.052 and 0.78 for 3d. (For historical reasons, the name used here is different from the one used in the 2012 paper by Kronbichler, Heister and Bangerth that describes ASPECT, see {cite}`kronbichler:etal:2012`. This parameter can be given as a single value or as a list with as many entries as one plus the number of compositional fields. In the former case all advection fields use the same stabilization parameters, in the latter case each field (temperature first, then all compositions) use individual parameters. This can be useful to reduce the stabilization for the temperature, which already has some physical diffusion. This parameter corresponds to the factor $\alpha_{\text{max}}$ in the formulas following equation (15) of the paper.) Units: None.
+**Documentation:** The $\beta$ factor in the artificial viscosity stabilization. This parameter controls the maximum dissipation of the entropy viscosity, which is the part that only scales with the cell diameter and the maximum velocity in the cell, but does not depend on the solution field itself or its residual. An appropriate value for 2d is 0.052 and 0.078 for 3d. (For historical reasons, the name used here is different from the one used in the 2012 paper by Kronbichler, Heister and Bangerth that describes ASPECT, see {cite}`kronbichler:etal:2012`. This parameter can be given as a single value or as a list with as many entries as one plus the number of compositional fields. In the former case all advection fields use the same stabilization parameters, in the latter case each field (temperature first, then all compositions) use individual parameters. This can be useful to reduce the stabilization for the temperature, which already has some physical diffusion. This parameter corresponds to the factor $\alpha_{\text{max}}$ in the formulas following equation (15) of the paper.) Units: None.
 
 (parameters:Discretization/Stabilization_20parameters/cR)=
 ### __Parameter name:__ cR

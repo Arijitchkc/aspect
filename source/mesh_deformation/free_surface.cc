@@ -109,10 +109,10 @@ namespace aspect
 
       // set up the matrix
       LinearAlgebra::SparseMatrix mass_matrix;
-      TrilinosWrappers::SparsityPattern sp (mesh_locally_owned,
-                                            mesh_locally_owned,
-                                            mesh_locally_relevant,
-                                            this->get_mpi_communicator());
+      LinearAlgebra::DynamicSparsityPattern sp (mesh_locally_owned,
+                                                mesh_locally_owned,
+                                                mesh_locally_relevant,
+                                                this->get_mpi_communicator());
       DoFTools::make_sparsity_pattern (mesh_deformation_dof_handler, sp, mass_matrix_constraints, false,
                                        Utilities::MPI::this_mpi_process(this->get_mpi_communicator()));
       sp.compress();
@@ -201,7 +201,22 @@ namespace aspect
 
       SolverControl solver_control(5*rhs.size(), this->get_parameters().linear_stokes_solver_tolerance*rhs.l2_norm());
       SolverCG<LinearAlgebra::Vector> cg(solver_control);
-      cg.solve (mass_matrix, dist_solution, rhs, preconditioner_mass);
+
+      try
+        {
+          cg.solve (mass_matrix, dist_solution, rhs, preconditioner_mass);
+        }
+      catch (const std::exception &exc)
+        {
+          // if the solver fails, report the error from processor 0 with some additional
+          // information about its location, and throw a quiet exception on all other
+          // processors
+          Utilities::throw_linear_solver_failure_exception("iterative free surface solver",
+                                                           "MeshDeformation::FreeSurface::project_velocity_onto_boundary()",
+                                                           std::vector<SolverControl> {solver_control},
+                                                           exc,
+                                                           this->get_mpi_communicator());
+        }
 
       mass_matrix_constraints.distribute (dist_solution);
       output = dist_solution;
@@ -219,7 +234,7 @@ namespace aspect
     void
     FreeSurface<dim>::compute_velocity_constraints_on_boundary(const DoFHandler<dim> &mesh_deformation_dof_handler,
                                                                AffineConstraints<double> &mesh_velocity_constraints,
-                                                               const std::set<types::boundary_id> &boundary_id) const
+                                                               const std::set<types::boundary_id> &boundary_ids) const
     {
       // For the free surface indicators we constrain the displacement to be v.n
       LinearAlgebra::Vector boundary_velocity;
@@ -235,11 +250,10 @@ namespace aspect
       const IndexSet constrained_dofs =
         DoFTools::extract_boundary_dofs(mesh_deformation_dof_handler,
                                         ComponentMask(dim, true),
-                                        boundary_id);
+                                        boundary_ids);
 
-      for (unsigned int i = 0; i < constrained_dofs.n_elements();  ++i)
+      for (const types::global_dof_index index : constrained_dofs)
         {
-          types::global_dof_index index = constrained_dofs.nth_index_in_set(i);
           if (mesh_velocity_constraints.can_store_line(index))
             if (mesh_velocity_constraints.is_constrained(index)==false)
               {

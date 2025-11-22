@@ -20,9 +20,16 @@
 
 
 #include <aspect/simulator.h>
+#include <aspect/advection_field.h>
 #include <aspect/mesh_deformation/free_surface.h>
 #include <aspect/mesh_deformation/interface.h>
 #include <aspect/particle/manager.h>
+
+namespace WorldBuilder
+{
+  class World;
+}
+
 
 namespace aspect
 {
@@ -304,7 +311,7 @@ namespace aspect
   SimulatorAccess<dim>::get_artificial_viscosity (Vector<float> &viscosity_per_cell,
                                                   const bool skip_interior_cells) const
   {
-    const typename Simulator<dim>::AdvectionField advection_field = Simulator<dim>::AdvectionField::temperature();
+    const AdvectionField advection_field = AdvectionField::temperature();
     simulator->get_artificial_viscosity(viscosity_per_cell, advection_field, skip_interior_cells);
   }
 
@@ -315,7 +322,7 @@ namespace aspect
   SimulatorAccess<dim>::get_artificial_viscosity_composition (Vector<float> &viscosity_per_cell,
                                                               const unsigned int compositional_variable) const
   {
-    const typename Simulator<dim>::AdvectionField advection_field = Simulator<dim>::AdvectionField::composition(compositional_variable);
+    const AdvectionField advection_field = AdvectionField::composition(compositional_variable);
     simulator->get_artificial_viscosity(viscosity_per_cell, advection_field);
   }
 
@@ -452,6 +459,15 @@ namespace aspect
 
 
   template <int dim>
+  const BoundaryConvectiveHeating::Manager<dim> &
+  SimulatorAccess<dim>::get_boundary_convective_heating_manager () const
+  {
+    return simulator->boundary_convective_heating_manager;
+  }
+
+
+
+  template <int dim>
   const BoundaryHeatFlux::Interface<dim> &
   SimulatorAccess<dim>::get_boundary_heat_flux () const
   {
@@ -485,6 +501,15 @@ namespace aspect
   SimulatorAccess<dim>::get_fixed_temperature_boundary_indicators () const
   {
     return get_boundary_temperature_manager().get_fixed_temperature_boundary_indicators();
+  }
+
+
+
+  template <int dim>
+  const std::set<types::boundary_id> &
+  SimulatorAccess<dim>::get_fixed_convective_heating_boundary_indicators () const
+  {
+    return get_boundary_convective_heating_manager().get_convective_heating_boundary_indicators();
   }
 
 
@@ -525,6 +550,7 @@ namespace aspect
   }
 
 
+
   template <int dim>
   const InitialTopographyModel::Interface<dim> &
   SimulatorAccess<dim>::get_initial_topography_model () const
@@ -533,6 +559,18 @@ namespace aspect
             ExcMessage("You can not call this function if no such model is actually available."));
     return *simulator->initial_topography_model.get();
   }
+
+
+
+  template <int dim>
+  const std::shared_ptr<const InitialTopographyModel::Interface<dim>>
+  SimulatorAccess<dim>::get_initial_topography_model_pointer () const
+  {
+    Assert (simulator->initial_topography_model.get() != nullptr,
+            ExcMessage("You can not call this function if no such model is actually available."));
+    return simulator->initial_topography_model;
+  }
+
 
 
   template <int dim>

@@ -26,6 +26,7 @@
 #ifdef ASPECT_WITH_FASTSCAPE
 
 #include <aspect/mesh_deformation/interface.h>
+#include <deal.II/base/parsed_function.h>
 
 namespace aspect
 {
@@ -44,14 +45,19 @@ namespace aspect
     {
       public:
         /**
+         * Destructor for FastScape.
+         */
+        ~FastScape() override;
+
+        /**
          * Initialize variables for FastScape.
          */
         virtual void initialize () override;
 
         /**
-         * Destructor for FastScape.
+         * Update input variables for FastScape.
          */
-        ~FastScape() override;
+        void update() override;
 
         /**
          * A function that creates constraints for the velocity of certain mesh
@@ -63,7 +69,7 @@ namespace aspect
         void
         compute_velocity_constraints_on_boundary(const DoFHandler<dim> &mesh_deformation_dof_handler,
                                                  AffineConstraints<double> &mesh_velocity_constraints,
-                                                 const std::set<types::boundary_id> &boundary_id) const override;
+                                                 const std::set<types::boundary_id> &boundary_ids) const override;
 
         /**
          * Returns whether or not the plugin requires surface stabilization
@@ -81,6 +87,36 @@ namespace aspect
          */
         void parse_parameters (ParameterHandler &prm) override;
 
+        /**
+         * Enumeration for selecting which type of additional output to use in Fastscape vtk.
+         * Select between Fastscape variables.
+         */
+        enum class FastscapeOutputVariable
+        {
+          //
+          kf,
+          kd,
+          uplift_rate
+        };
+        FastscapeOutputVariable additional_output_variable;
+
+        /**
+         * Serialize the contents of this class as far as they are not read
+         * from input parameter files.
+         */
+        template <class Archive>
+        void serialize (Archive &ar, const unsigned int version);
+
+        /**
+         * Save the state of this object.
+         */
+        void save (std::map<std::string, std::string> &status_strings) const override;
+
+        /**
+         * Restore the state of the object.
+         */
+        void load (const std::map<std::string, std::string> &status_strings) override;
+
       private:
         /**
          * Function used to set the FastScape ghost nodes. FastScape boundaries are
@@ -96,6 +132,7 @@ namespace aspect
                              std::vector<double> &velocity_x,
                              std::vector<double> &velocity_y,
                              std::vector<double> &velocity_z,
+                             std::vector<double> &bedrock_transport_coefficient_array,
                              const double &fastscape_timestep_in_years,
                              const bool init) const;
 
@@ -126,9 +163,8 @@ namespace aspect
          */
         void initialize_fastscape(std::vector<double> &elevation,
                                   std::vector<double> &basement,
-                                  std::vector<double> &bedrock_transport_coefficient_array,
-                                  std::vector<double> &bedrock_river_incision_rate_array,
-                                  std::vector<double> &silt_fraction) const;
+                                  std::vector<double> &silt_fraction,
+                                  bool restart) const;
 
         /**
          * Execute FastScape
@@ -138,6 +174,7 @@ namespace aspect
                                std::vector<double> &velocity_x,
                                std::vector<double> &velocity_y,
                                std::vector<double> &velocity_z,
+                               std::vector<double> &bedrock_transport_coefficient_array,
                                const double &fastscape_timestep_in_years,
                                const unsigned int &fastscape_iterations) const;
 
@@ -152,24 +189,10 @@ namespace aspect
         /**
          * Fill velocity data table to be interpolated back onto the ASPECT mesh.
          */
-        Table<dim,double> fill_data_table(std::vector<double> &values,
-                                          TableIndices<dim> &size_idx,
+        Table<dim,double> fill_data_table(const std::vector<double> &values,
+                                          const TableIndices<dim> &size_idx,
                                           const unsigned int &fastscape_nx,
                                           const unsigned int &fastscape_ny) const;
-
-        /**
-         * Read data from file for restarting.
-         */
-        void read_restart_files(std::vector<double> &elevation,
-                                std::vector<double> &basement,
-                                std::vector<double> &silt_fraction) const;
-
-        /**
-         * Save data to file for restarting.
-         */
-        void save_restart_files(const std::vector<double> &elevation,
-                                std::vector<double> &basement,
-                                std::vector<double> &silt_fraction) const;
 
         /**
          * Suggestion for the number of FastScape steps to run for every ASPECT timestep,
@@ -183,16 +206,6 @@ namespace aspect
          * limit it is repeatedly divided by 2 until the final timestep is smaller than this parameter.
          */
         double maximum_fastscape_timestep;
-
-        /**
-         * Check whether FastScape needs to be restarted. This is used as
-         * a mutable bool because we determine whether the model is being resumed in
-         * initialize(), and then after reinitializing FastScape we change it to false
-         * so it does not initialize FastScape again in future timesteps.
-         * TODO: There is probably a better way to do this, and restarts should be rolled into
-         * the general ASPECT restart.
-         */
-        mutable bool restart;
 
         /**
          * FastScape cell size in X.
@@ -441,26 +454,69 @@ namespace aspect
         double sediment_deposition_g;
 
         /**
-         * Bedrock river incision rate for the stream power law.
-         * (meters^(1-2m)/yr, $kf$ variable in FastScape surface equation.)
+         * Function of bedrock river incision rate (kf) for the stream power law.
+         * Represents the parameter `kf` in the FastScape landscape evolution equation.
+         * Units: ${m^(1-2drainage_area_exponent)/yr}$ if "Use years instead of seconds in output" is true;
+         * otherwise, the units are ${m^(1-2drainage_area_exponent)/s}$. Then a time scale factor will be applied to
+         * convert it into  ${m^(1-2drainage_area_exponent)/yr}$ for Fastscape.
+         * This function is used only if `use_kf_distribution_function` is set to true.
          */
-        double bedrock_river_incision_rate;
+        Functions::ParsedFunction<2> kf_distribution_function;
 
         /**
-         * Sediment river incision rate for the stream power law (meters^(1-2m)/yr).
+         * Flag to choose if a function of river incision rate for the stream power law will be applied.
+         */
+        bool use_kf_distribution_function;
+
+        /**
+         * Constant bedrock river incision rate (kf) for the stream power law.
+         * Represents the parameter `kf` in the FastScape landscape evolution equation.
+         * Units: ${m^(1-2drainage_area_exponent)/yr}$ if "Use years instead of seconds in output" is true;
+         * otherwise, the units are ${m^(1-2drainage_area_exponent)/s}$. Then a time scale factor will be applied to
+         * convert it into  ${m^(1-2drainage_area_exponent)/yr}$ for Fastscape.
+         */
+        double constant_bedrock_river_incision_rate;
+
+        /**
+         * Sediment river incision rate for the stream power law.
+         * Units: ${m^(1-2drainage_area_exponent)/yr}$ if "Use years instead of seconds in output" is true;
+         * otherwise, the units are ${m^(1-2drainage_area_exponent)/s}$. Then a time scale factor will be applied to
+         * convert it into  ${m^(1-2drainage_area_exponent)/yr}$ for Fastscape.
          * When set to -1 this is identical to the bedrock value.
          * ($kf$ variable in FastScape surface equation applied to sediment.)
          */
         double sediment_river_incision_rate;
 
         /**
-         * Bedrock transport coefficient for hillslope diffusion (m^2/yr, kd in FastScape surface equation.)
+         * Function of bedrock transport coefficient for hillslope diffusion.
+         * Represents the parameter `kd` in the FastScape landscape evolution equation.
+         * Units: ${m^2/yr}$ if "Use years instead of seconds in output" is true;
+         * otherwise, the units are ${m^2/s}$. Then a time scale factor will be applied to
+         * convert it into  ${m^2/yr}$ for Fastscape.
+         * This function is used only if `use_kd_distribution_function` is set to true.
          */
-        double bedrock_transport_coefficient;
+        Functions::ParsedFunction<2> kd_distribution_function;
 
         /**
-         * Sediment transport coefficient for hillslope diffusion (m^2/yr). When set to -1 this is
-         * identical to the bedrock value.
+         * Flag for using parsed function vs constant
+         */
+        bool use_kd_distribution_function;
+
+        /**
+         * Constant bedrock transport coefficient value for hillslope diffusion
+         * Units: ${m^2/yr}$ if "Use years instead of seconds in output" is true;
+         * otherwise, the units are ${m^2/s}$. Then a time scale factor will be applied to
+         * convert it into  ${m^2/yr}$ for Fastscape.
+         * This function is only used only if use_kf_distribution_function is false.
+         */
+        double constant_bedrock_transport_coefficient;
+
+        /**
+         * Sediment transport coefficient for hillslope diffusion.
+         * Units: ${m^2/yr}$ if "Use years instead of seconds in output" is true;
+         * otherwise, the units are ${m^2/s}$. Then a time scale factor will be applied to
+         * convert it into  ${m^2/yr}$ for Fastscape.
+         * When set to -1 this is identical to the bedrock value.
          * (kd in FastScape surface equation applied to sediment).
          */
         double sediment_transport_coefficient;
@@ -478,9 +534,24 @@ namespace aspect
          * a sea level of zero will represent the initial maximum unperturbed
          * Y (2D) or Z (3D) extent of the ASPECT domain. A negative value of
          * the sea level means the sea level lies below the initial unperturbed
-         * top boundary of the domain.
+         * top boundary of the domain. The sea level value can be either constant
+         * or a time dependent user-defined function.
          */
-        double sea_level;
+
+        /**
+         * User defined constant sea level value (m).
+         */
+        double sea_level_constant_value;
+
+        /**
+         * The user defined 1D function of time-dependent sea level.
+         */
+        Functions::ParsedFunction<1> sea_level_function;
+
+        /**
+        * Whether to use a function to define sea level.
+        */
+        bool use_sea_level_function;
 
         /**
          * Parameters to set an extra erosional base level

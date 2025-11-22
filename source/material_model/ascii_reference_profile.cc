@@ -105,19 +105,21 @@ namespace aspect
             out.reaction_terms[i][c] = 0.0;
 
           // fill seismic velocities outputs if they exist
-          if (SeismicAdditionalOutputs<dim> *seismic_out = out.template get_additional_output<SeismicAdditionalOutputs<dim>>())
-            {
-              if (seismic_vp_index != numbers::invalid_unsigned_int)
-                seismic_out->vp[i] = profile.get_data_component(profile_position,seismic_vp_index);
-              if (seismic_vs_index != numbers::invalid_unsigned_int)
-                seismic_out->vs[i] = profile.get_data_component(profile_position,seismic_vs_index);
-              if (seismic_dvp_dT_index != numbers::invalid_unsigned_int)
-                seismic_out->vp[i] += profile.get_data_component(profile_position,seismic_dvp_dT_index)
-                                      * temperature_deviation;
-              if (seismic_dvs_dT_index != numbers::invalid_unsigned_int)
-                seismic_out->vs[i] += profile.get_data_component(profile_position,seismic_dvs_dT_index)
-                                      * temperature_deviation;
-            }
+          if (const std::shared_ptr<SeismicAdditionalOutputs<dim>> seismic_out
+              = out.template get_additional_output_object<SeismicAdditionalOutputs<dim>>())
+            if (in.requests_property(MaterialProperties::additional_outputs))
+              {
+                if (seismic_vp_index != numbers::invalid_unsigned_int)
+                  seismic_out->vp[i] = profile.get_data_component(profile_position,seismic_vp_index);
+                if (seismic_vs_index != numbers::invalid_unsigned_int)
+                  seismic_out->vs[i] = profile.get_data_component(profile_position,seismic_vs_index);
+                if (seismic_dvp_dT_index != numbers::invalid_unsigned_int)
+                  seismic_out->vp[i] += profile.get_data_component(profile_position,seismic_dvp_dT_index)
+                                        * temperature_deviation;
+                if (seismic_dvs_dT_index != numbers::invalid_unsigned_int)
+                  seismic_out->vs[i] += profile.get_data_component(profile_position,seismic_dvs_dT_index)
+                                        * temperature_deviation;
+              }
         }
     }
 
@@ -225,7 +227,7 @@ namespace aspect
     void
     AsciiReferenceProfile<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
     {
-      if (out.template get_additional_output<SeismicAdditionalOutputs<dim>>() == nullptr
+      if (out.template has_additional_output_object<SeismicAdditionalOutputs<dim>>() == false
           && seismic_vp_index != numbers::invalid_unsigned_int
           && seismic_vs_index != numbers::invalid_unsigned_int)
         {

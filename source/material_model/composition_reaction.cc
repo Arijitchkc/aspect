@@ -35,7 +35,8 @@ namespace aspect
     evaluate(const MaterialModelInputs<dim> &in,
              MaterialModelOutputs<dim> &out) const
     {
-      ReactionRateOutputs<dim> *reaction_rate_out = out.template get_additional_output<ReactionRateOutputs<dim>>();
+      const std::shared_ptr<ReactionRateOutputs<dim>> reaction_rate_out
+        = out.template get_additional_output_object<ReactionRateOutputs<dim>>();
 
       // The Composition reaction model has up to two compositional fields (plus one background field)
       // that can influence the density
@@ -144,10 +145,10 @@ namespace aspect
 
           prm.declare_entry ("Reference temperature", "293.",
                              Patterns::Double (0.),
-                             "The reference temperature $T_0$. Units: \\si{\\kelvin}.");
+                             "The reference temperature $T_0$. Units: $\\text{K}$.");
           prm.declare_entry ("Viscosity", "5e24",
                              Patterns::Double (0.),
-                             "The value of the constant viscosity. Units: \\si{\\kilogram\\per\\meter\\per\\second}.");
+                             "The value of the constant viscosity. Units: $\\frac{\\text{kg}}{\\text{m}\\test{s}}$.");
           prm.declare_entry ("Composition viscosity prefactor 1", "1.0",
                              Patterns::Double (0.),
                              "A linear dependency of viscosity on the first compositional field. "
@@ -164,12 +165,12 @@ namespace aspect
           prm.declare_entry ("Thermal conductivity", "4.7",
                              Patterns::Double (0.),
                              "The value of the thermal conductivity $k$. "
-                             "Units: \\si{\\watt\\per\\meter\\per\\kelvin}.");
+                             "Units: $\\frac{\\text{W}}{\\text{m}\\text{K}}$$\\frac{\\text{W}{\\text{m}\\text{K}}$.");
           prm.declare_entry ("Reaction depth", "0.",
                              Patterns::Double (0.),
                              "Above this depth the compositional fields react: "
                              "The first field gets converted to the second field. "
-                             "Units: \\si{\\meter}.");
+                             "Units: $\\text{m}$.");
         }
         prm.leave_subsection();
       }
@@ -223,7 +224,7 @@ namespace aspect
     CompositionReaction<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
     {
       if (this->get_parameters().use_operator_splitting
-          && out.template get_additional_output<ReactionRateOutputs<dim>>() == nullptr)
+          && out.template has_additional_output_object<ReactionRateOutputs<dim>>() == false)
         {
           const unsigned int n_points = out.n_evaluation_points();
           out.additional_outputs.push_back(

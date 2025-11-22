@@ -80,6 +80,12 @@ namespace aspect
     template <int dim> class Interface;
   }
 
+  namespace BoundaryConvectiveHeating
+  {
+    template <int dim> class Manager;
+    template <int dim> class Interface;
+  }
+
   namespace BoundaryComposition
   {
     template <int dim> class Manager;
@@ -537,33 +543,41 @@ namespace aspect
       /** @{ */
 
       /**
-       * Return a pointer to the material model to access functions like
+       * Return a reference to the material model to access functions like
        * density().
        */
       const MaterialModel::Interface<dim> &
       get_material_model () const;
 
       /**
-       * Return a pointer to the gravity model description.
+       * Return a reference to the gravity model description.
        */
       const GravityModel::Interface<dim> &
       get_gravity_model () const;
 
       /**
-       * Return a pointer to the initial topography model.
+       * Return a reference to the initial topography model.
        */
       const InitialTopographyModel::Interface<dim> &
       get_initial_topography_model () const;
 
       /**
-       * Return a pointer to the geometry model.
+       * Return a shared pointer to the initial topography model.
+       * This function is useful if the calling function needs to
+       * store a pointer to the initial topography model.
+       */
+      const std::shared_ptr<const InitialTopographyModel::Interface<dim>>
+      get_initial_topography_model_pointer () const;
+
+      /**
+       * Return a reference to the geometry model.
        */
       const GeometryModel::Interface<dim> &
       get_geometry_model () const;
 
 
       /**
-       * Return a pointer to the object that describes the adiabatic
+       * Return a reference to the object that describes the adiabatic
        * conditions.
        */
       const AdiabaticConditions::Interface<dim> &
@@ -580,13 +594,22 @@ namespace aspect
       bool has_boundary_temperature () const;
 
       /**
-       * Return an reference to the manager of the boundary temperature models.
-       * This can then, for example, be used to get the names of the initial temperature
-       * models used in a computation, or to compute the initial temperature
+       * Return a reference to the manager of the boundary temperature models.
+       * This can then, for example, be used to get the names of the boundary temperature
+       * models used in a computation, or to compute the boundary temperature
        * for a given position.
        */
       const BoundaryTemperature::Manager<dim> &
       get_boundary_temperature_manager () const;
+
+      /**
+       * Return a reference to the manager of the boundary convective heating models.
+       * This can then, for example, be used to get the names of the boundary convective
+       * heating models used in a computation, or to compute the boundary conditions
+       * for a given position.
+       */
+      const BoundaryConvectiveHeating::Manager<dim> &
+      get_boundary_convective_heating_manager () const;
 
       /**
        * Return a reference to the object that describes heat flux
@@ -726,6 +749,13 @@ namespace aspect
        */
       const std::set<types::boundary_id> &
       get_fixed_heat_flux_boundary_indicators () const;
+
+      /**
+       * Return a set of boundary indicators that describes which of the
+       * boundaries have a convective heating, i.e. Robin boundary condition.
+       */
+      const std::set<types::boundary_id> &
+      get_fixed_convective_heating_boundary_indicators () const;
 
       /**
        * Return a set of boundary indicators that describes which of the

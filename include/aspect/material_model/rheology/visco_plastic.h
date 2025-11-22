@@ -34,6 +34,7 @@
 #include <aspect/material_model/rheology/compositional_viscosity_prefactors.h>
 #include <aspect/material_model/rheology/drucker_prager.h>
 #include <aspect/material_model/rheology/elasticity.h>
+#include <aspect/material_model/rheology/grain_boundary_sliding.h>
 #include <aspect/simulator_access.h>
 
 #include<deal.II/fe/component_mask.h>
@@ -70,7 +71,8 @@ namespace aspect
         std::vector<double> friction_angles;
 
         /**
-         * The plastic yield stress.
+         * The current plastic yield stress, depending on composition,
+         * pressure, and strain.
          */
         std::vector<double> yield_stresses;
 
@@ -98,14 +100,23 @@ namespace aspect
       std::vector<bool> composition_yielding;
 
       /**
-       * The current friction angle.
+       * All the drucker prager plasticity parameters.
        */
-      std::vector<double> current_friction_angles;
+      std::vector<Rheology::DruckerPragerParameters> drucker_prager_parameters;
 
       /**
-       * The current cohesion.
+       * The LHS term corresponding to plastic dilation in the
+       * Stokes system. For details, see the comments of
+       * MaterialModel::PrescribedDilation::dilation_lhs_term.
        */
-      std::vector<double> current_cohesions;
+      std::vector<double> dilation_lhs_terms;
+
+      /**
+       * The RHS term corresponding to plastic dilation in the
+       * Stokes system. For details, see the comments of
+       * MaterialModel::PrescribedDilation::dilation_rhs_term.
+       */
+      std::vector<double> dilation_rhs_terms;
     };
 
     namespace Rheology
@@ -147,7 +158,7 @@ namespace aspect
            */
           void compute_viscosity_derivatives(const unsigned int point_index,
                                              const std::vector<double> &volume_fractions,
-                                             const std::vector<double> &composition_viscosities,
+                                             const IsostrainViscosities &isostrain_values,
                                              const MaterialModel::MaterialModelInputs<dim> &in,
                                              MaterialModel::MaterialModelOutputs<dim> &out,
                                              const std::vector<double> &phase_function_values = std::vector<double>(),
@@ -243,14 +254,16 @@ namespace aspect
 
           /**
            * Enumeration for selecting which type of viscous flow law to use.
-           * Select between diffusion, dislocation, frank_kamenetskii or composite.
+           * Select between diffusion, dislocation, frank_kamenetskii, composite,
+           * or the minimum of the diffusion and dislocation viscosities.
            */
           enum ViscosityScheme
           {
             diffusion,
             dislocation,
             frank_kamenetskii,
-            composite
+            composite,
+            minimum_diffusion_dislocation
           } viscous_flow_law;
 
           /**
@@ -308,6 +321,16 @@ namespace aspect
           std::unique_ptr<Rheology::FrankKamenetskii<dim>> frank_kamenetskii_rheology;
 
           /**
+           * Whether to include grain boundary sliding in the constitutive formulation.
+           */
+          bool use_grain_boundary_sliding;
+
+          /**
+            Object for computing grain boundary sliding viscosities.
+           */
+          std::unique_ptr<Rheology::GrainBoundarySliding<dim>> grain_boundary_sliding_rheology;
+
+          /**
            * Whether to include Peierls creep in the constitutive formulation.
            */
           bool use_peierls_creep;
@@ -333,11 +356,6 @@ namespace aspect
            * Object for computing plastic stresses, viscosities, and additional outputs
            */
           Rheology::DruckerPrager<dim> drucker_prager_plasticity;
-
-          /*
-           * Input parameters for the drucker prager plasticity.
-           */
-          Rheology::DruckerPragerParameters drucker_prager_parameters;
 
       };
     }

@@ -393,7 +393,7 @@ namespace aspect
             sinTheta = x2/d1;
           }
 
-        double theta = atan2(sinTheta, cosTheta);
+        double theta = std::atan2(sinTheta, cosTheta);
         orientation[1] = - theta * constants::radians_to_degree;
 
         // now rotate about x axis
@@ -416,7 +416,7 @@ namespace aspect
             cosPhi = (x2*x2 + z2*z2)/(d1*d);
           }
 
-        double phi = atan2(sinPhi, cosPhi);
+        double phi = std::atan2(sinPhi, cosPhi);
         orientation[0] = phi * constants::radians_to_degree;
 
         // finally, rotate about z
@@ -436,7 +436,7 @@ namespace aspect
             sinAlpha = x3p/d2;
           }
 
-        double alpha = atan2(sinAlpha, cosAlpha);
+        double alpha = std::atan2(sinAlpha, cosAlpha);
         orientation[2] = alpha * constants::radians_to_degree;
         return orientation;
       }
@@ -585,7 +585,7 @@ namespace aspect
       std::string templ = data_directory+velocity_file_name;
       const int size = templ.length();
       std::vector<char> buffer(size+10);
-      snprintf (buffer.data(), size + 10, templ.c_str(), timestep);
+      std::snprintf (buffer.data(), size + 10, templ.c_str(), timestep);
       std::string str_filename (buffer.data());
       return str_filename;
     }
@@ -768,7 +768,7 @@ namespace aspect
                              "Time from which on the velocity file with number 'First velocity "
                              "file number' is used as boundary condition. Previous to this "
                              "time, a no-slip boundary condition is assumed. Depending on the setting "
-                             "of the global 'Use years in output instead of seconds' flag "
+                             "of the global 'Use years instead of seconds' flag "
                              "in the input file, this number is either interpreted as seconds or as years.");
           prm.declare_entry ("First data file number", "0",
                              Patterns::Integer (),
@@ -784,7 +784,7 @@ namespace aspect
           prm.declare_entry ("Data file time step", "1e6",
                              Patterns::Double (0.),
                              "Time step between following velocity files. "
-                             "Depending on the setting of the global 'Use years in output instead of seconds' flag "
+                             "Depending on the setting of the global 'Use years instead of seconds' flag "
                              "in the input file, this number is either interpreted as seconds or as years. "
                              "The default is one million, i.e., either one million seconds or one million years.");
           prm.declare_entry ("Scale factor", "1.",

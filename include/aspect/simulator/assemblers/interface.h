@@ -223,7 +223,7 @@ namespace aspect
                            const UpdateFlags         update_flags,
                            const UpdateFlags         face_update_flags,
                            const unsigned int        n_compositional_fields,
-                           const typename Simulator<dim>::AdvectionField     &field);
+                           const AdvectionField     &field);
           AdvectionSystem (const AdvectionSystem &scratch);
 
           FEValues<dim> finite_element_values;
@@ -317,7 +317,7 @@ namespace aspect
            * fields. See the documentation of the AdvectionField class for
            * more details.
            */
-          const typename Simulator<dim>::AdvectionField *advection_field;
+          const AdvectionField *advection_field;
 
           /**
            * The amount of entropy viscosity that should be applied to the
@@ -560,7 +560,8 @@ namespace aspect
          * and allows the assembler to attach AdditionalOutputs. The
          * function might be called more than once for a
          * MaterialModelOutput, so it is recommended to check if
-         * get_additional_output() returns an instance before adding a new
+         * MaterialModelOutputs<dim>::get_additional_output_object()
+         * returns an instance before adding a new
          * one to the additional_outputs vector. By default this function does
          * not create additional outputs.
          *

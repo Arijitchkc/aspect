@@ -22,7 +22,8 @@
 #include <aspect/postprocess/interface.h>
 #include <aspect/gravity_model/interface.h>
 #include <aspect/geometry_model/interface.h>
-#include <aspect/simulator.h>
+#include <aspect/introspection.h>
+#include <aspect/advection_field.h>
 #include <aspect/simulator_access.h>
 #include <aspect/global.h>
 
@@ -440,7 +441,8 @@ namespace aspect
             }
 
           // fill melt outputs if they exist
-          aspect::MaterialModel::MeltOutputs<dim> *melt_out = out.template get_additional_output<aspect::MaterialModel::MeltOutputs<dim>>();
+          const std::shared_ptr<aspect::MaterialModel::MeltOutputs<dim>> melt_out
+            = out.template get_additional_output_object<aspect::MaterialModel::MeltOutputs<dim>>();
 
           if (melt_out != nullptr)
             for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
@@ -484,23 +486,23 @@ namespace aspect
           prm.declare_entry ("Reference solid density", "3000",
                              Patterns::Double (0),
                              "Reference density of the solid $\\rho_{s,0}$. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
           prm.declare_entry ("Reference melt density", "2500",
                              Patterns::Double (0),
                              "Reference density of the melt/fluid$\\rho_{f,0}$. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
           prm.declare_entry ("Reference shear viscosity", "1e20",
                              Patterns::Double (0),
                              "The value of the constant viscosity $\\eta_0$ of the solid matrix. "
-                             "Units: \\si{\\pascal\\second}.");
+                             "Units: $\\text{Pa}\\text{s}$.");
           prm.declare_entry ("Reference compaction viscosity", "1e20",
                              Patterns::Double (0),
                              "The value of the constant volumetric viscosity $\\xi_0$ of the solid matrix. "
-                             "Units: \\si{\\pascal\\second}.");
+                             "Units: $\\text{Pa}\\text{s}$.");
           prm.declare_entry ("Reference melt viscosity", "100.0",
                              Patterns::Double (0),
                              "The value of the constant melt viscosity $\\eta_f$. "
-                             "Units: \\si{\\pascal\\second}.");
+                             "Units: $\\text{Pa}\\text{s}$.");
 
           prm.declare_entry ("Reference permeability", "5e-9",
                              Patterns::Double(),
@@ -827,7 +829,7 @@ namespace aspect
       AssertThrow(this->introspection().compositional_name_exists("porosity"),
                   ExcMessage("Postprocessor Solitary Wave only works if there is a compositional field called porosity."));
       const unsigned int porosity_index = this->introspection().compositional_index_for_name("porosity");
-      const typename Simulator<dim>::AdvectionField porosity = Simulator<dim>::AdvectionField::composition(porosity_index);
+      const AdvectionField porosity = AdvectionField::composition(porosity_index);
 
       // create a quadrature formula based on the compositional element alone.
       AssertThrow (this->introspection().n_compositional_fields > 0,

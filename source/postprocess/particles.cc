@@ -26,7 +26,6 @@
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 
-#include <cstdio>
 #include <unistd.h>
 
 namespace aspect
@@ -191,9 +190,8 @@ namespace aspect
 
 
     template <int dim>
-    // We need to pass the arguments by value, as this function can be called on a separate thread:
-    void Particles<dim>::writer (const std::string &filename, //NOLINT(performance-unnecessary-value-param)
-                                 const std::string &temporary_output_location, //NOLINT(performance-unnecessary-value-param)
+    void Particles<dim>::writer (const std::string &filename,
+                                 const std::string &temporary_output_location,
                                  const std::string &file_contents)
     {
       std::string tmp_filename = filename;
@@ -247,7 +245,7 @@ namespace aspect
       if (tmp_filename != filename)
         {
           std::string command = std::string("mv ") + tmp_filename + " " + filename;
-          int error = system(command.c_str());
+          int error = std::system(command.c_str());
 
           AssertThrow(error == 0,
                       ExcMessage("Could not move " + tmp_filename + " to "
@@ -309,6 +307,7 @@ namespace aspect
                                        description_file_prefix + ".visit");
 
       std::vector<std::pair<double, std::vector<std::string>>> times_and_output_file_names;
+      times_and_output_file_names.reserve(times_and_pvtu_file_names[description_file_prefix].size());
       for (unsigned int timestep=0; timestep<times_and_pvtu_file_names[description_file_prefix].size(); ++timestep)
         times_and_output_file_names.emplace_back(times_and_pvtu_file_names[description_file_prefix][timestep].first,
                                                  output_file_names_by_timestep[description_file_prefix][timestep]);
@@ -432,6 +431,7 @@ namespace aspect
                       std::vector<std::string> filenames;
                       const unsigned int n_processes = Utilities::MPI::n_mpi_processes(this->get_mpi_communicator());
                       const unsigned int n_files = (group_files == 0) ? n_processes : std::min(group_files,n_processes);
+                      filenames.reserve(n_files);
                       for (unsigned int i=0; i<n_files; ++i)
                         filenames.push_back (particle_file_prefix
                                              + "." + Utilities::int_to_string(i, 4)
@@ -669,7 +669,7 @@ namespace aspect
                              "output files. A value of zero indicates that "
                              "output should be generated every time step.\n\n"
                              "Units: years if the "
-                             "'Use years in output instead of seconds' parameter is set; "
+                             "'Use years instead of seconds' parameter is set; "
                              "seconds otherwise.");
 
           // now also see about the file format we're supposed to write in
@@ -792,7 +792,7 @@ namespace aspect
               // null pointer. System is guaranteed to return non-zero if it finds
               // a terminal and zero if there is none (like on the compute nodes of
               // some cluster architectures, e.g. IBM BlueGene/Q)
-              AssertThrow(system((char *)nullptr) != 0,
+              AssertThrow(std::system((char *)nullptr) != 0,
                           ExcMessage("Usage of a temporary storage location is only supported if "
                                      "there is a terminal available to move the files to their final location "
                                      "after writing. The system() command did not succeed in finding such a terminal."));

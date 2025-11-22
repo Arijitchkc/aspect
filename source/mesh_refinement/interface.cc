@@ -61,13 +61,11 @@ namespace aspect
       std::vector<Vector<float>> all_error_indicators (this->plugin_objects.size(),
                                                         Vector<float>(error_indicators.size()));
       unsigned int index = 0;
-      for (typename std::list<std::unique_ptr<Interface<dim>>>::const_iterator
-           p = this->plugin_objects.begin();
-           p != this->plugin_objects.end(); ++p, ++index)
+      for (auto &p : this->plugin_objects)
         {
           try
             {
-              (*p)->execute (all_error_indicators[index]);
+              p->execute (all_error_indicators[index]);
 
               for (unsigned int i=0; i<error_indicators.size(); ++i)
                 Assert (all_error_indicators[index](i) >= 0,
@@ -99,7 +97,7 @@ namespace aspect
               std::cerr << "Exception on MPI process <"
                         << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD)
                         << "> while running mesh refinement plugin <"
-                        << typeid(**p).name()
+                        << typeid(*p).name()
                         << ">: " << std::endl
                         << exc.what() << std::endl
                         << "Aborting!" << std::endl
@@ -117,7 +115,7 @@ namespace aspect
               std::cerr << "Exception on MPI process <"
                         << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD)
                         << "> while running mesh refinement plugin <"
-                        << typeid(**p).name()
+                        << typeid(*p).name()
                         << ">: " << std::endl;
               std::cerr << "Unknown exception!" << std::endl
                         << "Aborting!" << std::endl
@@ -127,6 +125,8 @@ namespace aspect
               // terminate the program!
               MPI_Abort (MPI_COMM_WORLD, 1);
             }
+
+          ++index;
         }
 
       // now merge the results
@@ -315,12 +315,11 @@ namespace aspect
                           "then one will have to decide which criteria should win when deciding "
                           "which cells to refine. The operation that determines how to combine these competing "
                           "criteria is the one that is selected here. The options are:\n\n"
-                          "\\begin{itemize}\n"
-                          "\\item \\texttt{plus}: Add the various error indicators together and "
+                          "\n"
+                          "* \\texttt{plus}: Add the various error indicators together and "
                           "refine those cells on which the sum of indicators is largest.\n"
-                          "\\item \\texttt{max}: Take the maximum of the various error indicators and "
+                          "* \\texttt{max}: Take the maximum of the various error indicators and "
                           "refine those cells on which the maximal indicators is largest.\n"
-                          "\\end{itemize}"
                           "The refinement indicators computed by each strategy are modified by "
                           "the ``Normalize individual refinement criteria'' and ``Refinement "
                           "criteria scale factors'' parameters.");

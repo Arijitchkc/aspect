@@ -27,10 +27,6 @@
 namespace aspect {
 namespace MaterialModel {
 namespace ReactionModel {
-
-template <int dim>
-Katz2003MantleMelting<dim>::Katz2003MantleMelting() = default;
-
 template <int dim>
 double Katz2003MantleMelting<dim>::reference_darcy_coefficient() const {
   // 0.01 = 1% melt
@@ -165,18 +161,23 @@ template <int dim>
 void Katz2003MantleMelting<dim>::calculate_reaction_rate_outputs(
     const typename Interface<dim>::MaterialModelInputs &in,
     typename Interface<dim>::MaterialModelOutputs &out) const {
-  ReactionRateOutputs<dim> *reaction_rate_out =
-      out.template get_additional_output<ReactionRateOutputs<dim>>();
+  const std::shared_ptr<ReactionRateOutputs<dim>> reaction_rate_out =
+      out.template get_additional_output_object<ReactionRateOutputs<dim>>();
 
   for (unsigned int i = 0; i < in.n_evaluation_points(); ++i) {
+    const double maximum_melt_fraction =
+        this->include_melt_transport()
+            ? in.composition[i][this->introspection()
+                                    .compositional_index_for_name("peridotite")]
+            : 0.0;
 
-    if (this->include_melt_transport()) {
+    if (this->include_melt_transport() &&
+        in.requests_property(MaterialProperties::reaction_rates)) {
       const unsigned int porosity_idx =
           this->introspection().compositional_index_for_name("porosity");
       const unsigned int peridotite_idx =
           this->introspection().compositional_index_for_name("peridotite");
       const double old_porosity = in.composition[i][porosity_idx];
-      const double maximum_melt_fraction = in.composition[i][peridotite_idx];
 
       // calculate the melting rate as difference between the equilibrium melt
       // fraction and the solution of the previous time step
@@ -273,30 +274,24 @@ void Katz2003MantleMelting<dim>::calculate_reaction_rate_outputs(
             reaction_rate_out->reaction_rates[i][c] = 0.0;
         }
       }
-
-      out.entropy_derivative_pressure[i] = entropy_change(
-          in.temperature[i],
-          this->get_adiabatic_conditions().pressure(in.position[i]),
-          maximum_melt_fraction, NonlinearDependence::pressure);
-      out.entropy_derivative_temperature[i] = entropy_change(
-          in.temperature[i],
-          this->get_adiabatic_conditions().pressure(in.position[i]),
-          maximum_melt_fraction, NonlinearDependence::temperature);
     } else {
-      out.entropy_derivative_pressure[i] = entropy_change(
-          in.temperature[i],
-          this->get_adiabatic_conditions().pressure(in.position[i]), 0,
-          NonlinearDependence::pressure);
-      out.entropy_derivative_temperature[i] = entropy_change(
-          in.temperature[i],
-          this->get_adiabatic_conditions().pressure(in.position[i]), 0,
-          NonlinearDependence::temperature);
-
       // no melting/freezing is used in the model --> set all reactions to zero
       for (unsigned int c = 0; c < in.composition[i].size(); ++c)
         if (reaction_rate_out != nullptr)
           reaction_rate_out->reaction_rates[i][c] = 0.0;
     }
+
+    if (in.requests_property(MaterialProperties::entropy_derivative_pressure))
+      out.entropy_derivative_pressure[i] = entropy_change(
+          in.temperature[i],
+          this->get_adiabatic_conditions().pressure(in.position[i]),
+          maximum_melt_fraction, NonlinearDependence::pressure);
+    if (in.requests_property(
+            MaterialProperties::entropy_derivative_temperature))
+      out.entropy_derivative_temperature[i] = entropy_change(
+          in.temperature[i],
+          this->get_adiabatic_conditions().pressure(in.position[i]),
+          maximum_melt_fraction, NonlinearDependence::temperature);
   }
 }
 
@@ -305,12 +300,13 @@ void Katz2003MantleMelting<dim>::calculate_fluid_outputs(
     const typename Interface<dim>::MaterialModelInputs &in,
     typename Interface<dim>::MaterialModelOutputs &out,
     const double reference_T) const {
-  MeltOutputs<dim> *melt_out =
-      out.template get_additional_output<MeltOutputs<dim>>();
+  const std::shared_ptr<MeltOutputs<dim>> melt_out =
+      out.template get_additional_output_object<MeltOutputs<dim>>();
   const unsigned int porosity_idx =
       this->introspection().compositional_index_for_name("porosity");
 
-  if (melt_out != nullptr) {
+  if (melt_out != nullptr &&
+      in.requests_property(MaterialProperties::additional_outputs)) {
 
     for (unsigned int i = 0; i < in.n_evaluation_points(); ++i) {
       double porosity = std::max(in.composition[i][porosity_idx], 0.0);
@@ -396,52 +392,52 @@ void Katz2003MantleMelting<dim>::declare_parameters(ParameterHandler &prm) {
                     "Constant parameter in the quadratic "
                     "function that approximates the solidus "
                     "of peridotite. "
-                    "Units: \\si{\\degreeCelsius}.");
+                    "Units: $^{\\circ}C$.");
   prm.declare_entry("A2", "1.329e-7", Patterns::Double(),
                     "Prefactor of the linear pressure term "
                     "in the quadratic function that approximates "
                     "the solidus of peridotite. "
-                    "Units: \\si{\\degreeCelsius\\per\\pascal}.");
+                    "Units: $\\frac{^{\\circ}C}{\\text{Pa}}$.");
   prm.declare_entry("A3", "-5.1e-18", Patterns::Double(),
                     "Prefactor of the quadratic pressure term "
                     "in the quadratic function that approximates "
                     "the solidus of peridotite. "
-                    "Units: \\si{\\degreeCelsius\\per\\pascal\\squared}.");
+                    "Units: $\\frac{^{\\circ}C}{\\text{Pa}^2}$.");
   prm.declare_entry("B1", "1475.0", Patterns::Double(),
                     "Constant parameter in the quadratic "
                     "function that approximates the lherzolite "
                     "liquidus used for calculating the fraction "
                     "of peridotite-derived melt. "
-                    "Units: \\si{\\degreeCelsius}.");
+                    "Units: $^{\\circ}C$.");
   prm.declare_entry("B2", "8.0e-8", Patterns::Double(),
                     "Prefactor of the linear pressure term "
                     "in the quadratic function that approximates "
                     "the  lherzolite liquidus used for "
                     "calculating the fraction of peridotite-"
                     "derived melt. "
-                    "Units: \\si{\\degreeCelsius\\per\\pascal}.");
+                    "Units: $\\frac{^{\\circ}C}{\\text{Pa}}$.");
   prm.declare_entry("B3", "-3.2e-18", Patterns::Double(),
                     "Prefactor of the quadratic pressure term "
                     "in the quadratic function that approximates "
                     "the  lherzolite liquidus used for "
                     "calculating the fraction of peridotite-"
                     "derived melt. "
-                    "Units: \\si{\\degreeCelsius\\per\\pascal\\squared}.");
+                    "Units: $\\frac{^{\\circ}C}{\\text{Pa}^2}$.");
   prm.declare_entry("C1", "1780.0", Patterns::Double(),
                     "Constant parameter in the quadratic "
                     "function that approximates the liquidus "
                     "of peridotite. "
-                    "Units: \\si{\\degreeCelsius}.");
+                    "Units: $^{\\circ}C$.");
   prm.declare_entry("C2", "4.50e-8", Patterns::Double(),
                     "Prefactor of the linear pressure term "
                     "in the quadratic function that approximates "
                     "the liquidus of peridotite. "
-                    "Units: \\si{\\degreeCelsius\\per\\pascal}.");
+                    "Units: $\\frac{^{\\circ}C}{\\text{Pa}}$.");
   prm.declare_entry("C3", "-2.0e-18", Patterns::Double(),
                     "Prefactor of the quadratic pressure term "
                     "in the quadratic function that approximates "
                     "the liquidus of peridotite. "
-                    "Units: \\si{\\degreeCelsius\\per\\pascal\\squared}.");
+                    "Units: $\\frac{^{\\circ}C}{\\text{Pa}^2}$.");
   prm.declare_entry("r1", "0.5", Patterns::Double(),
                     "Constant in the linear function that "
                     "approximates the clinopyroxene reaction "
@@ -451,7 +447,7 @@ void Katz2003MantleMelting<dim>::declare_parameters(ParameterHandler &prm) {
                     "Prefactor of the linear pressure term "
                     "in the linear function that approximates "
                     "the clinopyroxene reaction coefficient. "
-                    "Units: \\si{\\per\\pascal}.");
+                    "Units: $\\frac{1}{\\text{Pa}}$.");
   prm.declare_entry("beta", "1.5", Patterns::Double(),
                     "Exponent of the melting temperature in "
                     "the melt fraction calculation. "
@@ -464,18 +460,18 @@ void Katz2003MantleMelting<dim>::declare_parameters(ParameterHandler &prm) {
                     Patterns::Double(),
                     "The entropy change for the phase transition "
                     "from solid to melt of peridotite. "
-                    "Units: \\si{\\joule\\per\\kelvin\\per\\kilogram}.");
+                    "Units: $\\frac{\\text{J}}{\\text{K}\\text{kg}}$.");
   prm.declare_entry("Reference melt density", "2500.", Patterns::Double(0.),
                     "Reference density of the melt/fluid$\\rho_{f,0}$. "
-                    "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                    "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
   prm.declare_entry(
       "Reference bulk viscosity", "1e22", Patterns::Double(0.),
       "The value of the constant bulk viscosity $\\xi_0$ of the solid matrix. "
       "This viscosity may be modified by both temperature and porosity "
-      "dependencies. Units: \\si{\\pascal\\second}.");
+      "dependencies. Units: $\\text{Pa}\\text{s}$.");
   prm.declare_entry("Reference melt viscosity", "10.", Patterns::Double(0.),
                     "The value of the constant melt viscosity $\\eta_f$. "
-                    "Units: \\si{\\pascal\\second}.");
+                    "Units: $\\text{Pa}\\text{s}$.");
   prm.declare_entry(
       "Exponential melt weakening factor", "27.", Patterns::Double(0.),
       "The porosity dependence of the viscosity. Units: dimensionless.");
@@ -494,7 +490,7 @@ void Katz2003MantleMelting<dim>::declare_parameters(ParameterHandler &prm) {
       "Units: \\si{\\meter}.");
   prm.declare_entry("Melt compressibility", "0.0", Patterns::Double(0.),
                     "The value of the compressibility of the melt. "
-                    "Units: \\si{\\per\\pascal}.");
+                    "Units: $\\frac{1}{\\text{Pa}}$.");
   prm.declare_entry("Melt bulk modulus derivative", "0.0", Patterns::Double(0.),
                     "The value of the pressure derivative of the melt bulk "
                     "modulus. "
@@ -519,8 +515,7 @@ void Katz2003MantleMelting<dim>::declare_parameters(ParameterHandler &prm) {
       "If this parameter is set to a number larger than 0.0, it specifies the "
       "fraction of melt that will freeze per year (or per second, depending on "
       "the "
-      "``Use years in output instead of seconds'' parameter), as soon as the "
-      "porosity "
+      "``Use years instead of seconds'' parameter), as soon as the porosity "
       "exceeds the equilibrium melt fraction, and the equilibrium melt "
       "fraction "
       "falls below the depletion. In this case, melt will freeze according to "
@@ -546,8 +541,8 @@ void Katz2003MantleMelting<dim>::declare_parameters(ParameterHandler &prm) {
       "``Freezing rate'' and the ``Melting time scale for operator splitting'' "
       "defines how fast freezing occurs with respect to melting (if the "
       "product is 0.5, melting will occur twice as fast as freezing). "
-      "Units: 1/yr or 1/s, depending on the ``Use years "
-      "in output instead of seconds'' parameter.");
+      "Units: 1/yr or 1/s, depending on the ``Use years instead of seconds'' "
+      "parameter.");
   prm.declare_entry("Melting time scale for operator splitting", "1e3",
                     Patterns::Double(0.),
                     "Because the operator splitting scheme is used, the "
@@ -575,8 +570,8 @@ void Katz2003MantleMelting<dim>::declare_parameters(ParameterHandler &prm) {
                     "time step used in the operator splitting scheme, "
                     "otherwise reactions can not be "
                     "computed. "
-                    "Units: yr or s, depending on the ``Use years in output "
-                    "instead of seconds'' parameter.");
+                    "Units: yr or s, depending on the ``Use years instead of "
+                    "seconds'' parameter.");
   prm.declare_entry(
       "Depletion solidus change", "200.0", Patterns::Double(0.),
       "The solidus temperature change for a depletion of 100\\%. For positive "
@@ -584,7 +579,7 @@ void Katz2003MantleMelting<dim>::declare_parameters(ParameterHandler &prm) {
       "(depletion) and lowered for a negative peridotite field (enrichment). "
       "Scaling with depletion is linear. Only active when fractional melting "
       "is used. "
-      "Units: \\si{\\kelvin}.");
+      "Units: $\\text{K}$.");
   prm.declare_entry("Reference permeability", "1e-8", Patterns::Double(),
                     "Reference permeability of the solid host rock."
                     "Units: \\si{\\meter\\squared}.");
@@ -668,13 +663,11 @@ void Katz2003MantleMelting<dim>::parse_parameters(ParameterHandler &prm) {
 // explicit instantiations
 namespace aspect {
 namespace MaterialModel {
-#define INSTANTIATE(dim)                                                       \
-  namespace ReactionModel {                                                    \
-  template class Katz2003MantleMelting<dim>;                                   \
-  }
+namespace ReactionModel {
+#define INSTANTIATE(dim) template class Katz2003MantleMelting<dim>;
 
 ASPECT_INSTANTIATE(INSTANTIATE)
-
 #undef INSTANTIATE
+} // namespace ReactionModel
 } // namespace MaterialModel
 } // namespace aspect

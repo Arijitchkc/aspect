@@ -22,6 +22,7 @@
 #define _aspect_material_reaction_model_melt_tian2019_solubility_h
 
 #include <aspect/material_model/interface.h>
+#include <aspect/adiabatic_conditions/interface.h>
 #include <aspect/simulator_access.h>
 #include <aspect/melt.h>
 #include <aspect/utilities.h>
@@ -61,12 +62,12 @@ namespace aspect
            * @p in and @p melt_fraction need to have the same size.
            *
            * @param in Object that contains the current conditions.
-           * @param porosity_idx the index of the "porosity" composition
+           * @param mass_frac_porosity the mass fraction of the "porosity" composition
            * @param q the quadrature point index
            */
           double
           melt_fraction (const MaterialModel::MaterialModelInputs<dim> &in,
-                         const unsigned int porosity_idx,
+                         const double mass_frac_porosity,
                          unsigned int q) const;
 
           /**
@@ -103,6 +104,14 @@ namespace aspect
           double tian_max_gabbro_water;
           double tian_max_MORB_water;
           double tian_max_sediment_water;
+
+          /**
+           * If true, the adiabatic pressure is used in the Tian 2019 solubility model.
+           * If false, the full pressure is used instead. When simulating fully coupled
+           * fluid transport, setting this to true is recommended since the compaction
+           * pressure can lead to numerical instabilities when determining reaction rates.
+           */
+          bool use_adiabatic_pressure_for_reactions;
 
           /**
            *

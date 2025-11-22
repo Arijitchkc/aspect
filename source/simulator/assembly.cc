@@ -21,7 +21,6 @@
 
 #include <aspect/simulator.h>
 #include <aspect/utilities.h>
-#include <aspect/compat.h>
 #include <aspect/simulator_access.h>
 
 #include <aspect/simulator/assemblers/interface.h>
@@ -30,8 +29,9 @@
 #include <aspect/mesh_deformation/interface.h>
 #include <aspect/simulator/assemblers/stokes.h>
 #include <aspect/simulator/assemblers/advection.h>
+#include <aspect/simulator/assemblers/entropy_advection.h>
 
-#include <aspect/stokes_matrix_free.h>
+#include <aspect/simulator/solver/stokes_matrix_free.h>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/work_stream.h>
@@ -73,7 +73,7 @@ namespace aspect
     assemblers->stokes_preconditioner.push_back(std::make_unique<aspect::Assemblers::StokesPreconditioner<dim>>());
     assemblers->stokes_system.push_back(std::make_unique<aspect::Assemblers::StokesIncompressibleTerms<dim>>());
 
-    if (material_model->is_compressible())
+    if (material_model->is_compressible() || parameters.enable_prescribed_dilation)
       {
         // The compressible part of the preconditioner is only necessary if we use the simplified A block
         if (parameters.use_full_A_block_preconditioner == false)
@@ -184,8 +184,20 @@ namespace aspect
               std::make_unique<aspect::Assemblers::AdvectionSystemBoundaryHeatFlux<dim>>());
           }
 
+        if (i==0 && boundary_convective_heating_manager.get_fixed_convective_heating_boundary_indicators().size() != 0)
+          {
+            AssertThrow(parameters.stokes_solver_type != Parameters<dim>::StokesSolverType::block_gmg,
+                        ExcMessage ("The <Convective heating boundary indicators> parameter is set, but the "
+                                    "Stokes solver type is set to 'block GMG'. This is not supported. "
+                                    "Please change the Stokes solver type to something else."));
+
+            assemblers->advection_system_on_boundary_face[i].push_back(
+              std::make_unique<aspect::Assemblers::AdvectionSystemRobinBoundary<dim>>());
+          }
+
         if (parameters.use_discontinuous_temperature_discretization
-            || parameters.fixed_heat_flux_boundary_indicators.size() != 0)
+            || parameters.fixed_heat_flux_boundary_indicators.size() != 0
+            || boundary_convective_heating_manager.get_fixed_convective_heating_boundary_indicators().size() != 0)
           {
             assemblers->advection_system_assembler_on_face_properties[0].need_face_material_model_data = true;
             assemblers->advection_system_assembler_on_face_properties[0].need_face_finite_element_evaluation = true;
@@ -272,6 +284,9 @@ namespace aspect
     else
       AssertThrow(false,ExcInternalError());
 
+    if (introspection.composition_type_exists(CompositionalFieldDescription::entropy))
+      Assemblers::set_assemblers_entropy_advection(SimulatorAccess<dim>(*this), *assemblers);
+
     // allow other assemblers to add themselves or modify the existing ones by firing the signal
     this->signals.set_assemblers(*this, *assemblers);
 
@@ -318,6 +333,15 @@ namespace aspect
 
     for (unsigned int i=0; i<assemblers->stokes_preconditioner.size(); ++i)
       assemblers->stokes_preconditioner[i]->create_additional_material_model_outputs(scratch.material_model_outputs);
+
+    scratch.material_model_inputs.requested_properties
+      = MaterialModel::MaterialProperties::equation_of_state_properties |
+        MaterialModel::MaterialProperties::viscosity |
+        (parameters.include_melt_transport || assemble_newton_stokes_system
+         ?
+         MaterialModel::MaterialProperties::additional_outputs
+         :
+         MaterialModel::MaterialProperties::uninitialized);
 
     material_model->evaluate(scratch.material_model_inputs,
                              scratch.material_model_outputs);
@@ -448,7 +472,7 @@ namespace aspect
     else
       AssertThrow(false, ExcNotImplemented());
 
-    TimerOutput::Scope timer (computing_timer, "Build Stokes preconditioner");
+    computing_timer.enter_subsection("Build Stokes preconditioner");
     pcout << "   Rebuilding Stokes preconditioner..." << std::flush;
 
     // first assemble the raw matrices necessary for the preconditioner
@@ -456,15 +480,17 @@ namespace aspect
 
     // then extract the other information necessary to build the
     // AMG preconditioners for the A and M blocks
+#if !DEAL_II_VERSION_GTE(9,7,0)
     std::vector<std::vector<bool>> constant_modes;
     DoFTools::extract_constant_modes (dof_handler,
                                       introspection.component_masks.velocities,
                                       constant_modes);
+#endif
 
     // When we solve with melt migration, the pressure block contains
     // both pressures and contains an elliptic operator, so it makes
     // sense to use AMG instead of ILU:
-    if (parameters.include_melt_transport)
+    if (parameters.include_melt_transport || parameters.use_bfbt)
       Mp_preconditioner = std::make_unique<LinearAlgebra::PreconditionAMG>();
     else
       Mp_preconditioner = std::make_unique<LinearAlgebra::PreconditionILU>();
@@ -472,7 +498,12 @@ namespace aspect
     Amg_preconditioner = std::make_unique<LinearAlgebra::PreconditionAMG>();
 
     LinearAlgebra::PreconditionAMG::AdditionalData Amg_data;
+#if !DEAL_II_VERSION_GTE(9,7,0)
     Amg_data.constant_modes = constant_modes;
+#else
+    Amg_data.constant_modes = DoFTools::extract_constant_modes (dof_handler,
+                                                                introspection.component_masks.velocities);
+#endif
     Amg_data.elliptic = true;
     Amg_data.higher_order_elements = true;
 
@@ -504,28 +535,43 @@ namespace aspect
 
     if (parameters.include_melt_transport == false)
       {
-        LinearAlgebra::PreconditionILU *Mp_preconditioner_ILU
-          = dynamic_cast<LinearAlgebra::PreconditionILU *> (Mp_preconditioner.get());
-        Mp_preconditioner_ILU->initialize (system_preconditioner_matrix.block(1,1));
+        if (parameters.use_bfbt)
+          {
+            LinearAlgebra::PreconditionAMG *Mp_preconditioner_AMG = dynamic_cast<LinearAlgebra::PreconditionAMG *> (Mp_preconditioner.get());
+            Mp_preconditioner_AMG->initialize (system_preconditioner_matrix.block(1,1));
+          }
+        else
+          {
+            LinearAlgebra::PreconditionILU *Mp_preconditioner_ILU
+              = dynamic_cast<LinearAlgebra::PreconditionILU *> (Mp_preconditioner.get());
+            Mp_preconditioner_ILU->initialize (system_preconditioner_matrix.block(1,1));
+          }
+
       }
     else
       {
         // in the case of melt transport we have an AMG preconditioner for the lower right block.
-        LinearAlgebra::PreconditionAMG::AdditionalData Amg_data;
-        std::vector<std::vector<bool>> constant_modes;
         dealii::ComponentMask cm_pressure = introspection.component_masks.pressure;
         if (parameters.include_melt_transport)
           cm_pressure = cm_pressure | introspection.variable("compaction pressure").component_mask;
-        DoFTools::extract_constant_modes (dof_handler,
-                                          cm_pressure,
-                                          constant_modes);
 
+        LinearAlgebra::PreconditionAMG::AdditionalData Amg_data;
         Amg_data.elliptic = true;
         Amg_data.higher_order_elements = false;
 
         Amg_data.smoother_sweeps = 2;
         Amg_data.coarse_type = "symmetric Gauss-Seidel";
+
+#if !DEAL_II_VERSION_GTE(9,7,0)
+        std::vector<std::vector<bool>> constant_modes;
+        DoFTools::extract_constant_modes (dof_handler,
+                                          cm_pressure,
+                                          constant_modes);
         Amg_data.constant_modes = constant_modes;
+#else
+        Amg_data.constant_modes = DoFTools::extract_constant_modes (dof_handler,
+                                                                    cm_pressure);
+#endif
 
         LinearAlgebra::PreconditionAMG *Mp_preconditioner_AMG
           = dynamic_cast<LinearAlgebra::PreconditionAMG *> (Mp_preconditioner.get());
@@ -542,6 +588,8 @@ namespace aspect
     rebuild_stokes_preconditioner = false;
 
     pcout << std::endl;
+
+    computing_timer.leave_subsection("Build Stokes preconditioner");
   }
 
 
@@ -724,8 +772,7 @@ namespace aspect
         timer_section_name += " rhs";
       }
 
-    TimerOutput::Scope timer (computing_timer,
-                              timer_section_name);
+    computing_timer.enter_subsection(timer_section_name);
 
     if (rebuild_stokes_matrix == true)
       system_matrix = 0;
@@ -845,6 +892,8 @@ namespace aspect
 
     // record that we have just rebuilt the matrix
     rebuild_stokes_matrix = false;
+
+    computing_timer.leave_subsection(timer_section_name);
   }
 
 
@@ -855,9 +904,9 @@ namespace aspect
                                                  LinearAlgebra::PreconditionILU &preconditioner,
                                                  const double diagonal_strengthening)
   {
-    TimerOutput::Scope timer (computing_timer, (advection_field.is_temperature() ?
-                                                "Build temperature preconditioner" :
-                                                "Build composition preconditioner"));
+    computing_timer.enter_subsection(advection_field.is_temperature() ?
+                                     "Build temperature preconditioner" :
+                                     "Build composition preconditioner");
 
     const unsigned int block_idx = advection_field.block_index(introspection);
 
@@ -866,6 +915,10 @@ namespace aspect
     data.ilu_atol = diagonal_strengthening;
 
     preconditioner.initialize (system_matrix.block(block_idx, block_idx), data);
+
+    computing_timer.leave_subsection(advection_field.is_temperature() ?
+                                     "Build temperature preconditioner" :
+                                     "Build composition preconditioner");
   }
 
 
@@ -927,10 +980,10 @@ namespace aspect
           scratch.mesh_velocity_values);
 
     // compute material properties and heating terms
-    scratch.material_model_inputs.reinit  (scratch.finite_element_values,
-                                           cell,
-                                           this->introspection,
-                                           current_linearization_point);
+    scratch.material_model_inputs.reinit (scratch.finite_element_values,
+                                          cell,
+                                          this->introspection,
+                                          current_linearization_point);
 
     for (unsigned int i=0; i<1+introspection.n_compositional_fields; ++i)
       for (unsigned int j=0; j<assemblers->advection_system[i].size(); ++j)
@@ -942,6 +995,21 @@ namespace aspect
                                                           current_linearization_point,
                                                           scratch.finite_element_values,
                                                           introspection);
+
+    if (advection_field.is_temperature())
+      scratch.material_model_inputs.requested_properties
+        = MaterialModel::MaterialProperties::equation_of_state_properties |
+          MaterialModel::MaterialProperties::thermal_conductivity;
+
+    if (parameters.include_melt_transport)
+      scratch.material_model_inputs.requested_properties
+        = scratch.material_model_inputs.requested_properties |
+          MaterialModel::MaterialProperties::additional_outputs;
+
+    for (const auto &heating_model : heating_model_manager.get_active_plugins())
+      scratch.material_model_inputs.requested_properties
+        = scratch.material_model_inputs.requested_properties |
+          heating_model->get_required_properties();
 
     material_model->evaluate(scratch.material_model_inputs,
                              scratch.material_model_outputs);
@@ -956,13 +1024,14 @@ namespace aspect
       }
 
 #ifdef DEBUG
-    // make sure that if the model does not use operator splitting,
+    // make sure that if the model does not use operator splitting on fields or particles,
     // the material model outputs do not fill the reaction_rates (because the reaction_terms are used instead)
-    if (!parameters.use_operator_splitting)
+    if (!parameters.use_operator_splitting &&
+        !(introspection.compositional_name_exists("ve_stress_xx") && parameters.mapped_particle_properties.count(introspection.compositional_index_for_name("ve_stress_xx"))))
       {
         material_model->create_additional_named_outputs(scratch.material_model_outputs);
-        MaterialModel::ReactionRateOutputs<dim> *reaction_rate_outputs
-          = scratch.material_model_outputs.template get_additional_output<MaterialModel::ReactionRateOutputs<dim>>();
+        const std::shared_ptr<MaterialModel::ReactionRateOutputs<dim>> reaction_rate_outputs
+          = scratch.material_model_outputs.template get_additional_output_object<MaterialModel::ReactionRateOutputs<dim>>();
 
         Assert(reaction_rate_outputs == nullptr,
                ExcMessage("You are using a material model where the reaction rate outputs "
@@ -1060,6 +1129,16 @@ namespace aspect
                                                                       *scratch.face_finite_element_values,
                                                                       introspection);
 
+                if (advection_field.is_temperature())
+                  scratch.face_material_model_inputs.requested_properties
+                    = MaterialModel::MaterialProperties::equation_of_state_properties |
+                      MaterialModel::MaterialProperties::thermal_conductivity;
+
+                for (const auto &heating_model : heating_model_manager.get_active_plugins())
+                  scratch.face_material_model_inputs.requested_properties
+                    = scratch.face_material_model_inputs.requested_properties |
+                      heating_model->get_required_properties();
+
                 material_model->evaluate(scratch.face_material_model_inputs,
                                          scratch.face_material_model_outputs);
 
@@ -1143,9 +1222,9 @@ namespace aspect
   template <int dim>
   void Simulator<dim>::assemble_advection_system (const AdvectionField &advection_field)
   {
-    TimerOutput::Scope timer (computing_timer, (advection_field.is_temperature() ?
-                                                "Assemble temperature system" :
-                                                "Assemble composition system"));
+    computing_timer.enter_subsection(advection_field.is_temperature() ?
+                                     "Assemble temperature system" :
+                                     "Assemble composition system");
 
     const unsigned int block_idx = advection_field.block_index(introspection);
     const unsigned int sparsity_block_idx = advection_field.sparsity_pattern_block_index(introspection);
@@ -1252,6 +1331,10 @@ namespace aspect
 
     system_matrix.compress(VectorOperation::add);
     system_rhs.compress(VectorOperation::add);
+
+    computing_timer.leave_subsection(advection_field.is_temperature() ?
+                                     "Assemble temperature system" :
+                                     "Assemble composition system");
   }
 }
 

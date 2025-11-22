@@ -24,7 +24,6 @@
 
 #include <aspect/geometry_model/interface.h>
 #include <aspect/simulator_access.h>
-#include <aspect/compat.h>
 
 #include <deal.II/grid/manifold.h>
 #include <deal.II/base/function_lib.h>
@@ -55,7 +54,7 @@ namespace aspect
           /**
            * Constructor
            */
-          ChunkGeometry(const InitialTopographyModel::Interface<dim> &topography,
+          ChunkGeometry(const std::shared_ptr<const InitialTopographyModel::Interface<dim>> &topography,
                         const double min_longitude,
                         const double min_radius,
                         const double max_depth);
@@ -114,25 +113,21 @@ namespace aspect
             const Point<dim> &p) const override;
 
           /**
-           * This function computes the outer radius of the domain
-           * at the longitude (and latitude) of the given point
-           * (given in cartesian coordinates), i.e. the unperturbed
-           * outer radius + the topography.
-           */
-          double
-          get_radius(const Point<dim> &space_point) const;
-
-          /**
            * Return a copy of this manifold.
            */
           std::unique_ptr<Manifold<dim,dim>>
           clone() const override;
 
+          /**
+           * Return the topography at a given point
+           */
+          double topography_for_point(const Point<dim> &x_y_z) const;
+
         private:
           /**
            * A pointer to the topography model.
            */
-          const InitialTopographyModel::Interface<dim> *topo;
+          const std::shared_ptr<const InitialTopographyModel::Interface<dim>> topo;
 
           /**
            * The minimum longitude of the domain.

@@ -309,17 +309,18 @@ namespace aspect
               }
 
             // TODO: recrystallize at correct time while doing grain size evolution instead of afterwards
-            double phase_grain_size_reduction = 0.0;
             if (this->get_timestep_number() > 0)
               {
                 // check if material has crossed any phase transition, if yes, reset grain size
                 if (crossed_transition != -1)
                   if (recrystallized_grain_size[crossed_transition] > 0.0)
-                    phase_grain_size_reduction = grain_sizes[i] - recrystallized_grain_size[crossed_transition];
+                    grain_sizes[i] = recrystallized_grain_size[crossed_transition];
               }
 
+            // Make sure new grain size respects minimum grain size
             grain_sizes[i] = std::max(grain_sizes[i], minimum_grain_size);
-            const double grain_size_change = grain_sizes[i] - in.composition[i][grain_size_index] - phase_grain_size_reduction;
+
+            const double grain_size_change = grain_sizes[i] - in.composition[i][grain_size_index];
 
             // this reaction model is only responsible for the grain size field
             reaction_terms[i][grain_size_index] = grain_size_change;
@@ -501,12 +502,6 @@ namespace aspect
         AssertThrow((grain_size_evolution_formulation != Formulation::paleopiezometer || !this->get_heating_model_manager().shear_heating_enabled()),
                     ExcMessage("Shear heating output should not be used with the Paleopiezometer grain damage formulation."));
 
-        // TODO: Remove deprecated parameter in next release.
-        const std::string use_paleowattmeter  = prm.get ("Use paleowattmeter");
-        Assert(use_paleowattmeter == "default",
-               ExcMessage("The parameter 'Use paleowattmeter' has been removed. "
-                          "Use the parameter 'Grain size evolution formulation instead'."));
-
         const double volume_fraction_phase_one = prm.get_double ("Phase volume fraction");
 
         AssertThrow(volume_fraction_phase_one != 0. && volume_fraction_phase_one != 1.,
@@ -548,22 +543,6 @@ namespace aspect
             }
             prm.leave_subsection();
           }
-
-        // TODO: Remove deprecated parameters in next release.
-        const double pv_grain_size_scaling         = prm.get_double ("Lower mantle grain size scaling");
-        AssertThrow(pv_grain_size_scaling == 1.0,
-                    ExcMessage("Error: The 'Lower mantle grain size scaling' parameter "
-                               "has been removed. Please remove it from your input file. For models "
-                               "with large spatial variations in grain size, please advect your "
-                               "grain size on particles."));
-
-        // TODO: Remove deprecated parameters in next release.
-        const bool advect_log_grainsize            = prm.get_bool ("Advect logarithm of grain size");
-        AssertThrow(advect_log_grainsize == false,
-                    ExcMessage("Error: The 'Advect logarithm of grain size' parameter "
-                               "has been removed. Please remove it from your input file. For models "
-                               "with large spatial variations in grain size, please advect your "
-                               "grain size on particles."));
 
         arkode_initial_step_size = prm.get_double ("ARKode initial step size");
         arkode_minimum_step_size = prm.get_double ("ARKode minimum step size");
@@ -615,7 +594,7 @@ namespace aspect
       {
         // These properties will be used by the heating model to reduce
         // shear heating by the amount of work done to reduce grain size.
-        if (out.template get_additional_output<HeatingModel::ShearHeatingOutputs<dim>>() == nullptr)
+        if (out.template has_additional_output_object<HeatingModel::ShearHeatingOutputs<dim>>() == false)
           {
             const unsigned int n_points = out.n_evaluation_points();
             out.additional_outputs.push_back(
@@ -631,36 +610,35 @@ namespace aspect
                                                         const typename MaterialModel::MaterialModelOutputs<dim> &out,
                                                         const std::vector<unsigned int> &phase_indices,
                                                         const std::vector<double> &dislocation_viscosities,
-                                                        std::vector<std::unique_ptr<MaterialModel::AdditionalMaterialOutputs<dim>>> &additional_outputs) const
+                                                        std::vector<std::shared_ptr<MaterialModel::AdditionalMaterialOutputs<dim>>> &additional_outputs) const
       {
         for (auto &additional_output: additional_outputs)
           if (HeatingModel::ShearHeatingOutputs<dim> *shear_heating_out = dynamic_cast<HeatingModel::ShearHeatingOutputs<dim> *>(additional_output.get()))
-            {
-              for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
-                {
-                  if (grain_size_evolution_formulation == Formulation::paleowattmeter)
-                    {
-                      const double f = boundary_area_change_work_fraction[phase_indices[i]];
+            if (in.requests_property(MaterialProperties::additional_outputs))
+              {
+                for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
+                  {
+                    if (grain_size_evolution_formulation == Formulation::paleowattmeter)
+                      {
+                        const double f = boundary_area_change_work_fraction[phase_indices[i]];
 
-                      // We can only compute the fraction of work done to reduce grain size if we have the viscosity.
-                      // However, in some cases, we can get into this function without the viscosity being computed.
-                      // In that case we can only return a number that will trigger an exception if it were to be used.
-                      // We do not want to trigger the exception here, because we might not need the shear heating work
-                      // fraction at all, and only get into this function because other additional material outputs are needed.
-                      if (in.requests_property(MaterialProperties::viscosity))
-                        shear_heating_out->shear_heating_work_fractions[i] = 1. - f * out.viscosities[i] / dislocation_viscosities[i];
-                      else
-                        shear_heating_out->shear_heating_work_fractions[i] = numbers::signaling_nan<double>();
-                    }
-                  else if (grain_size_evolution_formulation == Formulation::pinned_grain_damage)
-                    {
-                      const double f = compute_partitioning_fraction(in.temperature[i]);
-                      shear_heating_out->shear_heating_work_fractions[i] = 1. - f;
-                    }
-                  else
-                    AssertThrow(false, ExcNotImplemented());
-                }
-            }
+                        // We can only compute the fraction of work done to reduce grain size if we have the viscosity.
+                        // Therefore, we need to make sure that the viscosity outputs have been filled by the material
+                        // model.
+                        if (!std::isnan(out.viscosities[0]))
+                          shear_heating_out->shear_heating_work_fractions[i] = 1. - f * out.viscosities[i] / dislocation_viscosities[i];
+                        else
+                          shear_heating_out->shear_heating_work_fractions[i] = numbers::signaling_nan<double>();
+                      }
+                    else if (grain_size_evolution_formulation == Formulation::pinned_grain_damage)
+                      {
+                        const double f = compute_partitioning_fraction(in.temperature[i]);
+                        shear_heating_out->shear_heating_work_fractions[i] = 1. - f;
+                      }
+                    else
+                      AssertThrow(false, ExcNotImplemented());
+                  }
+              }
       }
     }
   }
@@ -672,14 +650,13 @@ namespace aspect
 {
   namespace MaterialModel
   {
+    namespace ReactionModel
+    {
 #define INSTANTIATE(dim) \
-  namespace ReactionModel \
-  { \
-    template class GrainSizeEvolution<dim>; \
-  }
+  template class GrainSizeEvolution<dim>;
 
-    ASPECT_INSTANTIATE(INSTANTIATE)
-
+      ASPECT_INSTANTIATE(INSTANTIATE)
 #undef INSTANTIATE
+    }
   }
 }

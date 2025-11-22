@@ -21,7 +21,7 @@
 
 #include <aspect/mesh_refinement/compaction_length.h>
 #include <aspect/melt.h>
-#include <aspect/simulator.h>
+#include <aspect/advection_field.h>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_values.h>
@@ -42,8 +42,8 @@ namespace aspect
 
       // Use a quadrature in the support points of the porosity to compute the
       // compaction length at:
-      const typename Simulator<dim>::AdvectionField porosity = Simulator<dim>::AdvectionField::composition(
-                                                                 this->introspection().compositional_index_for_name("porosity"));
+      const AdvectionField porosity = AdvectionField::composition(
+                                        this->introspection().compositional_index_for_name("porosity"));
 
       const unsigned int base_element_index = porosity.base_element(this->introspection());
       const Quadrature<dim> quadrature(this->get_fe().base_element(base_element_index).get_unit_support_points());
@@ -67,7 +67,8 @@ namespace aspect
             in.reinit(fe_values, cell, this->introspection(), this->get_solution());
             this->get_material_model().evaluate(in, out);
 
-            MaterialModel::MeltOutputs<dim> *melt_out = out.template get_additional_output<MaterialModel::MeltOutputs<dim>>();
+            const std::shared_ptr<MaterialModel::MeltOutputs<dim>> melt_out
+              = out.template get_additional_output_object<MaterialModel::MeltOutputs<dim>>();
             AssertThrow(melt_out != nullptr,
                         ExcMessage("Need MeltOutputs from the material model for computing the melt properties."));
 

@@ -495,7 +495,8 @@ namespace aspect
     void
     MeltBoukare<dim>::
     melt_fractions (const MaterialModel::MaterialModelInputs<dim> &in,
-                    std::vector<double> &melt_fractions) const
+                    std::vector<double> &melt_fractions,
+                    const MaterialModel::MaterialModelOutputs<dim> *) const
     {
       const unsigned int Fe_solid_idx = this->introspection().compositional_index_for_name("molar_Fe_in_solid");
       unsigned int Fe_melt_idx = numbers::invalid_unsigned_int;
@@ -579,10 +580,10 @@ namespace aspect
     MeltBoukare<dim>::
     evaluate(const typename Interface<dim>::MaterialModelInputs &in, typename Interface<dim>::MaterialModelOutputs &out) const
     {
-      ReactionRateOutputs<dim> *reaction_rate_out = out.template get_additional_output<ReactionRateOutputs<dim>>();
-      MeltOutputs<dim> *melt_out = out.template get_additional_output<MeltOutputs<dim>>();
-      BoukareOutputs<dim> *boukare_out = out.template get_additional_output<BoukareOutputs<dim>>();
-      EnthalpyOutputs<dim> *enthalpy_out = out.template get_additional_output<EnthalpyOutputs<dim>>();
+      const std::shared_ptr<ReactionRateOutputs<dim>> reaction_rate_out = out.template get_additional_output_object<ReactionRateOutputs<dim>>();
+      const std::shared_ptr<MeltOutputs<dim>> melt_out = out.template get_additional_output_object<MeltOutputs<dim>>();
+      const std::shared_ptr<BoukareOutputs<dim>> boukare_out = out.template get_additional_output_object<BoukareOutputs<dim>>();
+      const std::shared_ptr<EnthalpyOutputs<dim>> enthalpy_out = out.template get_additional_output_object<EnthalpyOutputs<dim>>();
 
       const unsigned int Fe_solid_idx = this->introspection().compositional_index_for_name("molar_Fe_in_solid");
       unsigned int Fe_melt_idx = numbers::invalid_unsigned_int;
@@ -974,8 +975,7 @@ namespace aspect
                              "Also note that the melting time scale has to be larger than or equal to the reaction "
                              "time step used in the operator splitting scheme, otherwise reactions can not be "
                              "computed. If the model does not use operator splitting, this parameter is not used. "
-                             "Units: yr or s, depending on the ``Use years "
-                             "in output instead of seconds'' parameter.");
+                             "Units: yr or s, depending on the ``Use years instead of seconds'' parameter.");
           prm.declare_entry ("Fe mantle melting temperature", "3424.5",
                              Patterns::Double(),
                              "The melting temperature of one of the components in the melting "
@@ -1249,13 +1249,13 @@ namespace aspect
     MeltBoukare<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
     {
       if (this->get_parameters().use_operator_splitting
-          && out.template get_additional_output<ReactionRateOutputs<dim>>() == nullptr)
+          && out.template has_additional_output_object<ReactionRateOutputs<dim>>() == false)
         {
           out.additional_outputs.push_back(
             std::make_unique<MaterialModel::ReactionRateOutputs<dim>> (out.n_evaluation_points(), this->n_compositional_fields()));
         }
 
-      if (out.template get_additional_output<BoukareOutputs<dim>>() == nullptr)
+      if (out.template has_additional_output_object<BoukareOutputs<dim>>() == false)
         {
           out.additional_outputs.push_back(
             std::make_unique<MaterialModel::BoukareOutputs<dim>> (out.n_evaluation_points()));

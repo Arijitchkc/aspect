@@ -11,6 +11,7 @@
 @string{ajs = {American Journal of Science}}
 @string{cmame = {Computer Methods in Applied Mechanics and Engineering}}
 @string{pnas = {Proceedings of the National Academy of Sciences}}
+@string{jsg = {Journal of Structural Geology}}
 
 @article{tackley:2000,
 title={{Self-consistent generation of tectonic plates in time-dependent, three-dimensional 
@@ -60,7 +61,7 @@ year={2024},
 @article{halter:macherel:schmalholz:2022,
   title={A simple computer program for calculating stress and strain rate in 2D viscous inclusion-matrix systems},
   author={Halter, William R and Macherel, Emilie and Schmalholz, Stefan M},
-  journal={Journal of Structural Geology},
+  journal=jsg,
   volume={160},
   pages={104617},
   doi={10.1016/j.jsg.2022.104617},
@@ -999,6 +1000,17 @@ doi={10.1111/j.1365-246X.1995.tb03547.x},
   year =         1993,
   volume =       260,
   pages =        {771--778}
+}
+
+@article{karato2008,
+  title={Geodynamic significance of seismic anisotropy of the upper mantle: New insights from laboratory studies},
+  author={Karato, Shun-ichiro and Jung, Haemyeong and Katayama, Ikuo and Skemer, Philip},
+  journal={Annu. Rev. Earth Planet. Sci.},
+  volume={36},
+  number={1},
+  pages={59--95},
+  year={2008},
+  publisher={Annual Reviews}
 }
 
 @Article{LB02,
@@ -2567,6 +2579,17 @@ at a material contact discontinuity},
   volume  = 49,
   year    = 1983,
   pages   = {357--393}
+}
+
+@Article{hayes2018slab2,
+  title={Slab2, a comprehensive subduction zone geometry model},
+  author={Hayes, Gavin P and Moore, Ginevra L and Portner, Daniel E and Hearne, Mike and Flamme, Hanna and Furtney, Maria and Smoczyk, Gregory M},
+  journal={Science},
+  volume={362},
+  number={6410},
+  pages={58--61},
+  year={2018},
+  publisher={American Association for the Advancement of Science}
 }
 
 @Book{Hir88,
@@ -11855,11 +11878,11 @@ year = {2018},
 doi = {10.1016/j.earscirev.2017.11.012},
 }
 
-@Misc{thieulot:2019,
-  author = {C. Thieulot},
-  title  = {The Finite Element Method in Geodynamics},
-  url    = {https://github.com/cedrict/fieldstone/blob/master/manual.pdf},
-  year   = {2019}
+@misc{fieldstone,
+author = "Cedric Thieulot",
+title = "{Fieldstone: a computational geodynamics (self-)teaching tool}",
+year = "2023",
+url = {https://cedrict.github.io/}
 }
 
 @incollection{john:knobloch:2006,
@@ -11924,7 +11947,7 @@ doi = {10.1016/j.earscirev.2017.11.012},
 @article{buiter:etal:2016,
  title={{Benchmarking numerical models of brittle thrust wedges}},
  author={S.J.H. Buiter and G. Schreurs and M. Albertz and T.V. Gerya and B. Kaus and W. Landry and L. le Pourhiet and Y. Mishin and D.L. Egholm and M. Cooke and B. Maillot and C. Thieulot and T. Crook and D. May and P. Souloumiac and C. Beaumont},
- journal={Journal of Structural Geology},
+ journal=jsg,
  volume={92},
  number={},
  pages={140--177},
@@ -12056,6 +12079,17 @@ DOI = {10.5194/se-10-1785-2019}
   journal = {Geochemistry,  Geophysics,  Geosystems}
 }
 
+@article{kaminski2004,
+  title={D-Rex, a program for calculation of seismic anisotropy due to crystal lattice preferred orientation in the convective upper mantle},
+  author={Kaminski, Edouard and Ribe, Neil M and Browaeys, Jules T},
+  journal={Geophysical Journal International},
+  volume={158},
+  number={2},
+  pages={744--752},
+  year={2004},
+  publisher={Blackwell Publishing Ltd Oxford, UK}
+}
+
 @article{stixrude:lithgow-bertelloni:2011,
   title={Thermodynamics of mantle minerals-II. Phase equilibria},
   author={Stixrude, Lars and Lithgow-Bertelloni, Carolina},
@@ -12081,7 +12115,7 @@ DOI = {10.5194/se-10-1785-2019}
 author={C. Thieulot and W. Bangerth},
 title={On the choice of finite element for applications in geodynamics},
 journal={Solid Earth},
-doi={10.5194/se-13-1-2022},
+doi={10.5194/se-13-229-2022},
 volume={13},
 year={2022}}
 
@@ -12166,6 +12200,20 @@ title = {A community benchmark for subduction zone modeling},
 volume = {171},
 journal = {Physics of the Earth and Planetary Interiors},
 doi = {10.1016/j.pepi.2008.04.015}
+}
+
+@Article{munch:globalcoarsening:2023,
+  author    = {Peter Munch and Timo Heister and Laura Prieto Saavedra and Martin Kronbichler},
+  title     = {Efficient Distributed Matrix-free Multigrid Methods on Locally Refined Meshes for {FEM} Computations},
+  journal   = {{ACM} Transactions on Parallel Computing},
+  year      = {2023},
+  volume    = {10},
+  number    = {1},
+  pages     = {1--38},
+  month     = mar,
+  doi       = {10.1145/3580314},
+  publisher = {Association for Computing Machinery ({ACM})},
+  url       = {https://arxiv.org/abs/2203.12292},
 }
 
 @article{mulyukova:bercovici:2018,
@@ -12411,4 +12459,178 @@ NUMBER = {11},
 PAGES = {3221--3239},
 URL = {https://gmd.copernicus.org/articles/16/3221/2023/},
 DOI = {10.5194/gmd-16-3221-2023}
+}
+
+@article{myhill:etal:2023,
+  doi = {10.21105/joss.05389},
+  url = {https://doi.org/10.21105/joss.05389},
+  year = {2023},
+  publisher = {The Open Journal},
+  volume = {8},
+  number = {87},
+  pages = {5389},
+  author = {Robert Myhill and Sanne Cottaar and Timo Heister and Ian Rose and Cayman Unterborn and Juliane Dannberg and Rene Gassmoeller},
+  title = {BurnMan -- a Python toolkit for planetary geophysics, geochemistry and thermodynamics},
+  journal = {Journal of Open Source Software}
+}
+
+@article{wheeler:2018,
+  title={The effects of stress on reactions in the Earth: Sometimes rather mean, usually normal, always important},
+  author={Wheeler, John},
+  journal={Journal of Metamorphic Geology},
+  volume={36},
+  number={4},
+  pages={439--461},
+  year={2018},
+  publisher={Wiley Online Library}
+}
+
+@article{liu:etal:1998,
+  title={The effect of strain energy on growth rates during the olivine-spinel transformation and implications for olivine metastability in subducting slabs},
+  author={Liu, Ming and Kerschhofer, Ljuba and Mosenfelder, Jed L and Rubie, David C},
+  journal={Journal of Geophysical Research: Solid Earth},
+  volume={103},
+  number={B10},
+  pages={23897--23909},
+  year={1998},
+  publisher={Wiley Online Library}
+}
+
+@article{guest:etal:2003,
+  title={Stress field in the subducting lithosphere and comparison with deep earthquakes in Tonga},
+  author={Guest, A and Schubert, G and Gable, Carl Walter},
+  journal={Journal of Geophysical Research: Solid Earth},
+  volume={108},
+  number={B6},
+  year={2003},
+  publisher={Wiley Online Library}
+}
+
+@article{urai:etal:1986,
+  title={Weakening of rock salt by water during long-term creep},
+  author={Urai, Janos L and Spiers, Christopher J and Zwart, Hendrik J and Lister, Gordon S},
+  journal={Nature},
+  volume={324},
+  number={6097},
+  pages={554--557},
+  doi={10.1038/324554a0},
+  year={1986}
+}
+
+@article{jackson:etal:1994,
+  title={{Structural Dynamics of Salt Systems}},
+  author={M.P.A. Jackson and B.C. Vendeville and D.D. Schultz-Ela},
+  journal={Annu. Rev. Earth Planet. Sci.},
+  volume={22},
+  pages={93-117},
+  doi={10.1146/annurev.ea.22.050194.000521},
+  year={1994}
+}
+
+@article{vankeken:etal:1993,
+  title={The effective viscosity of rocksalt: implementation of steady-state creep laws in numerical models of salt diapirism},
+  author={P.E. {van Keken} and C.J. Spiers and A.P. {van den Berg} and E.J. Muyzert},
+  journal={Tectonophysics}, 
+  volume={225},
+  pages={457--476},
+  doi={10.1016/0040-1951(93)90310-G},
+  year={1993}
+}
+
+@article{burchardt:etal:2011,
+  title={Strain pattern within and around denser blocks sinking within Newtonian salt structures},
+  author={Burchardt, Steffi and Koyi, Hemin and Schmeling, Harro},
+  journal=jsg,  
+  volume={33},
+  number={2},
+  pages={145--153},
+  doi={10.1016/j.jsg.2010.11.007},
+  year={2011}
+}
+
+@article{burchardt:etal:2012a,
+  title={Sinking of anhydrite blocks within a Newtonian salt diapir: modelling the influence of block aspect ratio and salt stratification},
+  author={Burchardt, Steffi and Koyi, Hemin and Schmeling, Harro and Fuchs, Lukas},
+  journal=gji,
+  volume={188},
+  number={3},
+  pages={763--778},
+  doi={10.1111/j.1365-246X.2011.05290.x},
+  year={2012}
+}
+
+@article{burchardt:etal:2012b,
+  title={The influence of viscosity contrast on the strain pattern and magnitude within and around dense blocks sinking through Newtonian rock salt},
+  author={Burchardt, Steffi and Koyi, Hemin and Schmeling, Harro},
+  journal=jsg,
+  volume={35},
+  pages={102--116},
+  doi={10.1016/j.jsg.2011.07.007},
+  year={2012}
+}
+
+@article{guest:etal:2004,
+  title={Stresses along the metastable wedge of olivine in a subducting slab: possible explanation for the Tonga double seismic layer},
+  author={Guest, A and Schubert, G and Gable, Carl Walter},
+  journal={Physics of the Earth and Planetary Interiors},
+  volume={141},
+  number={4},
+  pages={253--267},
+  year={2004},
+  publisher={Elsevier}
+}
+
+@article{devaux:etal:2000,
+  title={Stresses in a subducting slab in the presence of a metastable olivine wedge},
+  author={Philippe Devaux, Jean and Fleitout, Luce and Schubert, Gerald and Anderson, Charles},
+  journal={Journal of Geophysical Research: Solid Earth},
+  volume={105},
+  number={B6},
+  pages={13365--13373},
+  year={2000},
+  publisher={Wiley Online Library}
+}
+
+@article{avrami:1939,
+  title={Kinetics of phase change. I General theory},
+  author={Avrami, Melvin},
+  journal={The Journal of chemical physics},
+  volume={7},
+  number={12},
+  pages={1103--1112},
+  year={1939},
+  publisher={American Institute of Physics}
+}
+
+@article{schmeling:etal:1999,
+  title={The influence of olivine metastability on the dynamics of subduction},
+  author={Schmeling, Harro and Monz, Ralf and Rubie, David C},
+  journal={Earth and Planetary Science Letters},
+  volume={165},
+  number={1},
+  pages={55--66},
+  year={1999},
+  publisher={Elsevier}
+}
+
+@article{stixrude:lithgow-bertelloni:2022,
+  title={Thermal expansivity, heat capacity and bulk modulus of the mantle},
+  author={Stixrude, Lars and Lithgow-Bertelloni, Carolina},
+  journal={Geophysical Journal International},
+  volume={228},
+  number={2},
+  pages={1119--1149},
+  year={2022},
+  publisher={Oxford University Press}
+}
+
+@article{gleason:tullis:1995,
+  title={A flow law for dislocation creep of quartz aggregates determined with the molten salt cell},
+  author={Gleason, Gayle C and Tullis, Jan},
+  journal={Tectonophysics},
+  volume={247},
+  number={1-4},
+  pages={1--23},
+  year={1995},
+  publisher={Elsevier B.V.}
 }

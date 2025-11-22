@@ -24,7 +24,8 @@
 #include <aspect/geometry_model/initial_topography_model/zero_topography.h>
 #include <aspect/geometry_model/box.h>
 #include <aspect/simulator.h>
-#include <aspect/stokes_matrix_free.h>
+#include <aspect/simulator/solver/matrix_free_operators.h>
+#include <aspect/simulator/solver/stokes_matrix_free.h>
 
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_accessor.h>
@@ -50,6 +51,8 @@ namespace aspect
       :
       free_surface_theta(stabilization_theta)
     {}
+
+
 
     template <int dim>
     void
@@ -523,7 +526,7 @@ namespace aspect
     {
       AssertThrow(sim.parameters.mesh_deformation_enabled, ExcInternalError());
 
-      TimerOutput::Scope timer (sim.computing_timer, "Mesh deformation");
+      this->get_computing_timer().enter_subsection("Mesh deformation");
 
       old_mesh_displacements = mesh_displacements;
 
@@ -544,6 +547,8 @@ namespace aspect
 
       // After changing the mesh we need to rebuild things
       sim.rebuild_stokes_matrix = sim.rebuild_stokes_preconditioner = true;
+
+      this->get_computing_timer().leave_subsection("Mesh deformation");
     }
 
 
@@ -607,11 +612,11 @@ namespace aspect
       this->get_signals().post_compute_no_normal_flux_constraints(sim.triangulation);
 
       // Ask all plugins to add their constraints.
-      // For the moment add constraints from all plugins into one matrix, then
-      // merge that matrix with the existing constraints (respecting the existing
-      // constraints as more important)
+      // For the moment add constraints from all plugins into one object, then
+      // merge that object with the existing constraints (respecting the existing
+      // constraints as more important).
 #if DEAL_II_VERSION_GTE(9,7,0)
-      AffineConstraints<double> plugin_constraints(mesh_vertex_constraints.get_local_lines(),
+      AffineConstraints<double> plugin_constraints(mesh_deformation_dof_handler.locally_owned_dofs(),
                                                    mesh_vertex_constraints.get_local_lines());
 #else
       AffineConstraints<double> plugin_constraints(mesh_vertex_constraints.get_local_lines());
@@ -619,13 +624,12 @@ namespace aspect
 
       for (const auto &boundary_id : mesh_deformation_objects)
         {
-          std::set<types::boundary_id> boundary_id_set;
-          boundary_id_set.insert(boundary_id.first);
+          const std::set<types::boundary_id> boundary_id_set = { boundary_id.first };
 
           for (const auto &model : boundary_id.second)
             {
 #if DEAL_II_VERSION_GTE(9,7,0)
-              AffineConstraints<double> current_plugin_constraints(mesh_vertex_constraints.get_local_lines(),
+              AffineConstraints<double> current_plugin_constraints(mesh_deformation_dof_handler.locally_owned_dofs(),
                                                                    mesh_vertex_constraints.get_local_lines());
 #else
               AffineConstraints<double> current_plugin_constraints(mesh_vertex_constraints.get_local_lines());
@@ -634,7 +638,7 @@ namespace aspect
               model->compute_velocity_constraints_on_boundary(mesh_deformation_dof_handler,
                                                               current_plugin_constraints,
                                                               boundary_id_set);
-              if ((this->is_stokes_matrix_free()))
+              if (this->is_stokes_matrix_free())
                 {
                   mg_constrained_dofs.make_zero_boundary_constraints(mesh_deformation_dof_handler,
                                                                      boundary_id_set);
@@ -661,14 +665,15 @@ namespace aspect
                         {
                           // Add the inhomogeneity of the current plugin to the existing constraints
                           const double inhomogeneity = plugin_constraints.get_inhomogeneity(local_line);
-                          plugin_constraints.set_inhomogeneity(local_line, current_plugin_constraints.get_inhomogeneity(local_line) + inhomogeneity);
+                          plugin_constraints.set_inhomogeneity(local_line,
+                                                               current_plugin_constraints.get_inhomogeneity(local_line) + inhomogeneity);
                         }
                     }
                 }
             }
         }
 
-      mesh_velocity_constraints.merge(plugin_constraints,AffineConstraints<double>::left_object_wins);
+      mesh_velocity_constraints.merge(plugin_constraints, AffineConstraints<double>::left_object_wins);
       mesh_velocity_constraints.close();
     }
 
@@ -850,10 +855,10 @@ namespace aspect
         coupling[c][c] = DoFTools::always;
 
       LinearAlgebra::SparseMatrix mesh_matrix;
-      TrilinosWrappers::SparsityPattern sp (mesh_locally_owned,
-                                            mesh_locally_owned,
-                                            mesh_locally_relevant,
-                                            sim.mpi_communicator);
+      LinearAlgebra::DynamicSparsityPattern sp (mesh_locally_owned,
+                                                mesh_locally_owned,
+                                                mesh_locally_relevant,
+                                                sim.mpi_communicator);
       DoFTools::make_sparsity_pattern (mesh_deformation_dof_handler,
                                        coupling, sp,
                                        mesh_velocity_constraints, false,
@@ -897,14 +902,22 @@ namespace aspect
       mesh_matrix.compress (VectorOperation::add);
 
       // Make the AMG preconditioner
+#if !DEAL_II_VERSION_GTE(9,7,0)
       std::vector<std::vector<bool>> constant_modes;
       DoFTools::extract_constant_modes (mesh_deformation_dof_handler,
                                         ComponentMask(dim, true),
                                         constant_modes);
+#endif
+
       // TODO: think about keeping object between time steps
       LinearAlgebra::PreconditionAMG preconditioner_stiffness;
       LinearAlgebra::PreconditionAMG::AdditionalData Amg_data;
+#if !DEAL_II_VERSION_GTE(9,7,0)
       Amg_data.constant_modes = constant_modes;
+#else
+      Amg_data.constant_modes = DoFTools::extract_constant_modes (mesh_deformation_dof_handler,
+                                                                  ComponentMask(dim, true));
+#endif
       Amg_data.elliptic = true;
       Amg_data.higher_order_elements = false;
       Amg_data.smoother_sweeps = 2;
@@ -919,8 +932,22 @@ namespace aspect
       SolverControl solver_control(5*rhs.size(), tolerance * rhs.l2_norm());
       SolverCG<LinearAlgebra::Vector> cg(solver_control);
 
-      cg.solve (mesh_matrix, solution, rhs, preconditioner_stiffness);
-      this->get_pcout() << "   Solving mesh displacement system... " << solver_control.last_step() <<" iterations."<< std::endl;
+      try
+        {
+          cg.solve (mesh_matrix, solution, rhs, preconditioner_stiffness);
+          this->get_pcout() << "   Solving mesh displacement system... " << solver_control.last_step() <<" iterations."<< std::endl;
+        }
+      catch (const std::exception &exc)
+        {
+          // if the solver fails, report the error from processor 0 with some additional
+          // information about its location, and throw a quiet exception on all other
+          // processors
+          Utilities::throw_linear_solver_failure_exception("iterative mesh displacement solver",
+                                                           "MeshDeformationHandler::compute_mesh_displacements()",
+                                                           std::vector<SolverControl> {solver_control},
+                                                           exc,
+                                                           this->get_mpi_communicator());
+        }
 
       mesh_velocity_constraints.distribute (solution);
 
@@ -942,8 +969,6 @@ namespace aspect
           mesh_displacements = solution;
         }
 
-      if (this->is_stokes_matrix_free())
-        update_multilevel_deformation();
     }
 
 
@@ -1197,8 +1222,23 @@ namespace aspect
       SolverCG<dealii::LinearAlgebra::distributed::Vector<double>> cg(solver_control_mf);
 
       mesh_velocity_constraints.set_zero(solution);
-      cg.solve(laplace_operator, solution, rhs, preconditioner);
-      this->get_pcout() << "   Solving mesh displacement system... " << solver_control_mf.last_step() <<" iterations."<< std::endl;
+
+      try
+        {
+          cg.solve(laplace_operator, solution, rhs, preconditioner);
+          this->get_pcout() << "   Solving mesh displacement system... " << solver_control_mf.last_step() <<" iterations."<< std::endl;
+        }
+      catch (const std::exception &exc)
+        {
+          // if the solver fails, report the error from processor 0 with some additional
+          // information about its location, and throw a quiet exception on all other
+          // processors
+          Utilities::throw_linear_solver_failure_exception("iterative mesh displacement solver",
+                                                           "MeshDeformationHandler::compute_mesh_displacements_gmg()",
+                                                           std::vector<SolverControl> {solver_control_mf},
+                                                           exc,
+                                                           this->get_mpi_communicator());
+        }
 
       mesh_velocity_constraints.distribute(solution);
       solution.update_ghost_values();
@@ -1473,13 +1513,15 @@ namespace aspect
       if (this->simulator_is_past_initialization() == false ||
           this->get_timestep_number() == 0)
         {
-          TimerOutput::Scope timer (sim.computing_timer, "Mesh deformation initialize");
+          this->get_computing_timer().enter_subsection("Mesh deformation initialize");
 
           make_initial_constraints();
           if (this->is_stokes_matrix_free())
             compute_mesh_displacements_gmg();
           else
             compute_mesh_displacements();
+
+          this->get_computing_timer().leave_subsection("Mesh deformation initialize");
         }
 
       if (this->is_stokes_matrix_free())
@@ -1497,7 +1539,7 @@ namespace aspect
       // to transfer to the MG levels below. The conversion is done by
       // going through a ReadWriteVector.
       dealii::LinearAlgebra::distributed::Vector<double> displacements(mesh_deformation_dof_handler.locally_owned_dofs(),
-                                                                       this->get_triangulation().get_communicator());
+                                                                       this->get_mpi_communicator());
       dealii::LinearAlgebra::ReadWriteVector<double> rwv;
       rwv.reinit(mesh_displacements);
       displacements.import_elements(rwv, VectorOperation::insert);

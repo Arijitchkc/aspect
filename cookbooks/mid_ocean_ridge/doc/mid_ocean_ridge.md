@@ -1,3 +1,14 @@
+```{tags}
+category:cookbook
+feature:2d
+feature:cartesian
+feature:compositional-fields
+feature:nonlinear-solver
+feature:melt
+feature:two-phase-flow
+```
+
+(sec:cookbooks:mid-ocean-ridge)=
 # Melt migration in a 2D mid-ocean ridge model
 
 *This section was contributed by Juliane Dannberg.*

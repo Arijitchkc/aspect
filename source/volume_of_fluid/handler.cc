@@ -20,6 +20,7 @@
 
 #include <aspect/global.h>
 #include <aspect/parameters.h>
+#include <aspect/advection_field.h>
 #include <aspect/volume_of_fluid/handler.h>
 #include <aspect/mesh_refinement/volume_of_fluid_interface.h>
 #include <aspect/simulator/assemblers/interface.h>
@@ -255,7 +256,7 @@ namespace aspect
 
       prm.declare_entry ("Number initialization samples", "3",
                          Patterns::Integer (1),
-                         "Number of divisions per dimension when computing the initial volume fractions."
+                         "Number of divisions per dimension when computing the initial volume fractions. "
                          "If set to the default of 3 for a 2d model, then initialization will be based on "
                          "the initialization criterion at $3^2=9$ points within each cell. If the initialization "
                          "based on a composition style initial condition, a larger value may be desired for better "
@@ -495,7 +496,7 @@ namespace aspect
 
 
   template <int dim>
-  void VolumeOfFluidHandler<dim>::do_volume_of_fluid_update (const typename Simulator<dim>::AdvectionField &advection_field)
+  void VolumeOfFluidHandler<dim>::do_volume_of_fluid_update (const AdvectionField &advection_field)
   {
     const bool direction_order_descending = (this->get_timestep_number() % 2) == 1;
     const VolumeOfFluidField<dim> volume_of_fluid_field = data[volume_of_fluid_composition_map_index[advection_field.field_index()]];
@@ -537,7 +538,7 @@ namespace aspect
                                                                    const unsigned int dir,
                                                                    const bool update_from_old)
   {
-    TimerOutput::Scope timer (sim.computing_timer, "Assemble volume of fluid system");
+    this->get_computing_timer().enter_subsection("Assemble volume of fluid system");
 
     const unsigned int block0_idx = field_struct_for_field_index(0).volume_fraction.block_index;
     const unsigned int block_idx = field.volume_fraction.block_index;
@@ -596,6 +597,8 @@ namespace aspect
 
     sim.system_matrix.compress(VectorOperation::add);
     sim.system_rhs.compress(VectorOperation::add);
+
+    this->get_computing_timer().leave_subsection("Assemble volume of fluid system");
   }
 
 

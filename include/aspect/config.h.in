@@ -26,12 +26,28 @@
 
 // optional features:
 #cmakedefine ASPECT_HAVE_LINK_H
+
+#cmakedefine ASPECT_WITH_FASTSCAPE
 #cmakedefine ASPECT_WITH_LIBDAP
 #cmakedefine ASPECT_WITH_NETCDF
 #cmakedefine ASPECT_WITH_PERPLEX
+#cmakedefine ASPECT_WITH_PYTHON
 #cmakedefine ASPECT_WITH_WORLD_BUILDER
+
+#cmakedefine ASPECT_HAVE_FASTSCAPE_NAMED_VTK
 #cmakedefine ASPECT_USE_FP_EXCEPTIONS
-#cmakedefine ASPECT_WITH_FASTSCAPE
 
 #define ASPECT_MAX_NUM_PARTICLE_SYSTEMS @ASPECT_MAX_NUM_PARTICLE_SYSTEMS@
+
+
+/**
+ * A macro that is used in instantiating the ASPECT classes and functions for
+ * both 2d and 3d. Call this macro with the name of another macro that when
+ * called with a single integer argument instantiates the respective classes
+ * in the given space dimension.
+ */
+#define ASPECT_INSTANTIATE(INSTANTIATIONS) \
+  INSTANTIATIONS(2) \
+  INSTANTIATIONS(3)
+
 #endif

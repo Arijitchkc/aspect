@@ -1,3 +1,11 @@
+```{tags}
+category:cookbook
+category:benchmark
+feature:2d
+feature:spherical
+```
+
+(sec:cookbooks:bunke-mantle-convection)=
 # The Bunge et al. mantle convection experiments
 
 *This section was contributed by Cedric Thieulot and Bob Myhill.*

@@ -11,7 +11,7 @@ Number of mesh deformation degrees of freedom: 306
 
    Postprocessing:
      Topography min/max: -9.313e-10 m, 9.313e-10 m
-     RMS, max velocity:  0.292 m/year, 0.816 m/year
+     RMS, max velocity:  0.292 m/year, 0.815 m/year
 
 *** Timestep 1:  t=22998.4 years, dt=22998.4 years
    Solving mesh displacement system... 4 iterations.
@@ -20,7 +20,7 @@ Number of mesh deformation degrees of freedom: 306
 
    Postprocessing:
      Topography min/max: -5484 m, 1.173e+04 m
-     RMS, max velocity:  0.318 m/year, 0.739 m/year
+     RMS, max velocity:  0.318 m/year, 0.774 m/year
 
 *** Timestep 2:  t=47219.9 years, dt=24221.5 years
    Solving mesh displacement system... 4 iterations.
@@ -56,7 +56,7 @@ Number of mesh deformation degrees of freedom: 306
 
    Postprocessing:
      Topography min/max: -1099 m, 2317 m
-     RMS, max velocity:  0.185 m/year, 0.57 m/year
+     RMS, max velocity:  0.185 m/year, 0.571 m/year
 
 
 
@@ -68,7 +68,7 @@ Number of mesh deformation degrees of freedom: 306
 
    Postprocessing:
      Topography min/max: -494.4 m, 402.4 m
-     RMS, max velocity:  0.198 m/year, 0.635 m/year
+     RMS, max velocity:  0.198 m/year, 0.634 m/year
 
 *** Timestep 7:  t=194709 years, dt=29555 years
    Solving mesh displacement system... 4 iterations.
@@ -86,16 +86,16 @@ Number of mesh deformation degrees of freedom: 306
 
    Postprocessing:
      Topography min/max: -259.8 m, 367.9 m
-     RMS, max velocity:  0.193 m/year, 0.618 m/year
+     RMS, max velocity:  0.193 m/year, 0.617 m/year
 
 *** Timestep 9:  t=257720 years, dt=30375.8 years
    Solving mesh displacement system... 4 iterations.
    Solving temperature system... 9 iterations.
-   Solving Stokes system (GMG)... 0+42 iterations.
+   Solving Stokes system (GMG)... 0+41 iterations.
 
    Postprocessing:
      Topography min/max: -829.5 m, 1796 m
-     RMS, max velocity:  0.187 m/year, 0.584 m/year
+     RMS, max velocity:  0.187 m/year, 0.583 m/year
 
 *** Timestep 10:  t=289932 years, dt=32211.5 years
    Solving mesh displacement system... 4 iterations.
@@ -104,7 +104,7 @@ Number of mesh deformation degrees of freedom: 306
 
    Postprocessing:
      Topography min/max: -283 m, 766.8 m
-     RMS, max velocity:  0.192 m/year, 0.608 m/year
+     RMS, max velocity:  0.192 m/year, 0.607 m/year
 
 
 

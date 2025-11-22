@@ -75,6 +75,7 @@ namespace aspect
     }
 
 
+
     template <int dim>
     void
     Function<dim>::update()
@@ -86,6 +87,7 @@ namespace aspect
       else
         boundary_heat_flux_function.set_time (this->get_time());
     }
+
 
 
     template <int dim>
@@ -113,6 +115,7 @@ namespace aspect
       }
       prm.leave_subsection();
     }
+
 
 
     template <int dim>
@@ -172,8 +175,8 @@ namespace aspect
                                              "The symbol $t$ indicating time that "
                                              "may appear in the formulas for the prescribed "
                                              "heat flux is interpreted as having units "
-                                             "seconds unless the global parameter ``Use "
-                                             "years in output instead of seconds'' has "
+                                             "seconds unless the global parameter "
+                                             "``Use years instead of seconds'' has "
                                              "been set.")
   }
 }

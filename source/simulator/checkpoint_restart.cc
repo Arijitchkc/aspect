@@ -25,9 +25,18 @@
 #include <aspect/melt.h>
 
 #include <deal.II/base/mpi.h>
+#include <deal.II/base/utilities.h>
 #include <deal.II/grid/grid_tools.h>
+
+#if DEAL_II_VERSION_GTE(9,7,0)
+#include <deal.II/numerics/solution_transfer.h>
+#else
 #include <deal.II/distributed/solution_transfer.h>
+#endif
+
 #include <deal.II/fe/mapping_q_cache.h>
+
+#include <cstring>
 
 #ifdef DEAL_II_WITH_ZLIB
 #  include <zlib.h>
@@ -35,40 +44,6 @@
 
 namespace aspect
 {
-  namespace
-  {
-    /**
-     * Move/rename a file from the given old to the given new name.
-     */
-    void move_file (const std::string &old_name,
-                    const std::string &new_name)
-    {
-      int error = std::system (("mv " + old_name + " " + new_name).c_str());
-
-      // If the above call failed, e.g. because there is no command-line
-      // available, try with internal functions.
-      if (error != 0)
-        {
-          if (Utilities::fexists(new_name))
-            {
-              error = remove(new_name.c_str());
-              AssertThrow (error == 0, ExcMessage(std::string ("Unable to remove file: "
-                                                               + new_name
-                                                               + ", although it seems to exist. "
-                                                               + "The error code is "
-                                                               + Utilities::to_string(error) + ".")));
-            }
-
-          error = rename(old_name.c_str(),new_name.c_str());
-          AssertThrow (error == 0, ExcMessage(std::string ("Unable to rename files: ")
-                                              +
-                                              old_name + " -> " + new_name
-                                              + ". The error code is "
-                                              + Utilities::to_string(error) + "."));
-        }
-    }
-  }
-
 
   namespace
   {
@@ -114,7 +89,7 @@ namespace aspect
       bool convert_to_years;
       ia >> convert_to_years;
       AssertThrow (convert_to_years == parameters.convert_to_years,
-                   ExcMessage ("The value provided for `Use years in output instead of seconds' that was stored "
+                   ExcMessage ("The value provided for `Use years instead of seconds' that was stored "
                                "in the checkpoint file is not the same as the one "
                                "you currently set in your input file. "
                                "These need to be the same during restarting "
@@ -276,11 +251,18 @@ namespace aspect
   template <int dim>
   void Simulator<dim>::create_snapshot()
   {
-    TimerOutput::Scope timer (computing_timer, "Create snapshot");
+    computing_timer.enter_subsection("Create snapshot");
 
     // Take elapsed time from timer so that we can serialize it:
     total_walltime_until_last_snapshot += wall_timer.wall_time();
     wall_timer.restart();
+
+    const unsigned int n_checkpoints_to_keep = 3;
+    // This will rotate from 01 to n_checkpoints_to_keep including:
+    const unsigned int checkpoint_id = (last_checkpoint_id % n_checkpoints_to_keep) + 1;
+
+    const std::string checkpoint_path = parameters.output_directory + "restart/" + Utilities::int_to_string(checkpoint_id, 2) + "/";
+    Utilities::create_directory(checkpoint_path, mpi_communicator, true);
 
     const unsigned int my_id = Utilities::MPI::this_mpi_process (mpi_communicator);
 
@@ -293,7 +275,11 @@ namespace aspect
       if (parameters.mesh_deformation_enabled)
         x_system.push_back( &mesh_deformation->mesh_velocity );
 
-      parallel::distributed::SolutionTransfer<dim, LinearAlgebra::BlockVector>
+#if !DEAL_II_VERSION_GTE(9,7,0)
+      using namespace dealii::parallel::distributed;
+#endif
+
+      SolutionTransfer<dim, LinearAlgebra::BlockVector>
       system_trans (dof_handler);
 
       system_trans.prepare_for_serialization (x_system);
@@ -302,14 +288,14 @@ namespace aspect
       // If we are deforming the mesh, also serialize the mesh vertices vector, which
       // uses its own dof handler
       std::vector<const LinearAlgebra::Vector *> x_fs_system;
-      std::unique_ptr<parallel::distributed::SolutionTransfer<dim,LinearAlgebra::Vector>> mesh_deformation_trans;
+      std::unique_ptr<SolutionTransfer<dim,LinearAlgebra::Vector>> mesh_deformation_trans;
       if (parameters.mesh_deformation_enabled)
         {
           x_fs_system.push_back (&mesh_deformation->mesh_displacements);
           x_fs_system.push_back (&mesh_deformation->initial_topography);
 
           mesh_deformation_trans
-            = std::make_unique<parallel::distributed::SolutionTransfer<dim,LinearAlgebra::Vector>>
+            = std::make_unique<SolutionTransfer<dim,LinearAlgebra::Vector>>
               (mesh_deformation->mesh_deformation_dof_handler);
 
           mesh_deformation_trans->prepare_for_serialization(x_fs_system);
@@ -317,7 +303,7 @@ namespace aspect
 
       signals.pre_checkpoint_store_user_data(triangulation);
 
-      triangulation.save (parameters.output_directory + "restart.mesh.new");
+      triangulation.save (checkpoint_path + "mesh");
     }
 
     // save general information This calls the serialization functions on all
@@ -351,14 +337,14 @@ namespace aspect
           Assert (err == Z_OK, ExcInternalError());
 
           // build compression header
-          const uint32_t compression_header[4]
+          const std::uint32_t compression_header[4]
             = { 1,                                   /* number of blocks */
-                static_cast<uint32_t>(oss.str().length()), /* size of block */
-                static_cast<uint32_t>(oss.str().length()), /* size of last block */
-                static_cast<uint32_t>(compressed_data_length)
+                static_cast<std::uint32_t>(oss.str().length()), /* size of block */
+                static_cast<std::uint32_t>(oss.str().length()), /* size of last block */
+                static_cast<std::uint32_t>(compressed_data_length)
               }; /* list of compressed sizes of blocks */
 
-          std::ofstream f ((parameters.output_directory + "restart.resume.z.new"));
+          std::ofstream f (checkpoint_path + "/resume.z");
           f.write(reinterpret_cast<const char *>(compression_header), 4 * sizeof(compression_header[0]));
           f.write(reinterpret_cast<char *>(&compressed_data[0]), compressed_data_length);
           f.close();
@@ -369,8 +355,8 @@ namespace aspect
           // or one of the write() commands fails, as the fail state is
           // "sticky".
           if (!f)
-            AssertThrow(false, ExcMessage ("Writing of the checkpoint file '" + parameters.output_directory
-                                           + "restart.resume.z.new' with size "
+            AssertThrow(false, ExcMessage ("Writing of the checkpoint file '" + checkpoint_path
+                                           + "/resume.z' with size "
                                            + Utilities::to_string(4 * sizeof(compression_header[0])+compressed_data_length)
                                            + " failed on processor 0."));
         }
@@ -392,57 +378,38 @@ namespace aspect
     // can be slow, and the model might be cancelled during writing.
     // This way restart remains usable even if restart.new is not completely
     // written.
+    last_checkpoint_id = checkpoint_id;
     if (my_id == 0)
       {
-        // if we have previously written a snapshot, then keep the last
-        // snapshot in case this one fails to save. Note: static variables
-        // will only be initialized once per model run.
-        static bool previous_snapshot_exists = (parameters.resume_computation == true);
-
-        if (previous_snapshot_exists == true)
-          {
-            move_file (parameters.output_directory + "restart.mesh",
-                       parameters.output_directory + "restart.mesh.old");
-            move_file (parameters.output_directory + "restart.mesh.info",
-                       parameters.output_directory + "restart.mesh.info.old");
-            move_file (parameters.output_directory + "restart.resume.z",
-                       parameters.output_directory + "restart.resume.z.old");
-
-            move_file (parameters.output_directory + "restart.mesh_fixed.data",
-                       parameters.output_directory + "restart.mesh_fixed.data.old");
-
-            if (Utilities::fexists(parameters.output_directory + "restart.mesh_variable.data"))
-              {
-                move_file (parameters.output_directory + "restart.mesh_variable.data",
-                           parameters.output_directory + "restart.mesh_variable.data.old");
-              }
-
-          }
-
-        move_file (parameters.output_directory + "restart.mesh.new",
-                   parameters.output_directory + "restart.mesh");
-        move_file (parameters.output_directory + "restart.mesh.new.info",
-                   parameters.output_directory + "restart.mesh.info");
-        move_file (parameters.output_directory + "restart.resume.z.new",
-                   parameters.output_directory + "restart.resume.z");
-
-        move_file (parameters.output_directory + "restart.mesh.new_fixed.data",
-                   parameters.output_directory + "restart.mesh_fixed.data");
-
-        if (Utilities::fexists(parameters.output_directory + "restart.mesh.new_variable.data"))
-          {
-            move_file (parameters.output_directory + "restart.mesh.new_variable.data",
-                       parameters.output_directory + "restart.mesh_variable.data");
-          }
-
-
-        // from now on, we know that if we get into this
-        // function again that a snapshot has previously
-        // been written
-        previous_snapshot_exists = true;
+        std::ofstream f (parameters.output_directory + "restart/last_good_checkpoint.txt");
+        f << last_checkpoint_id;
+        f.close();
       }
 
-    pcout << "*** Snapshot created!" << std::endl << std::endl;
+    pcout << "*** Snapshot " << checkpoint_path << " created!" << std::endl << std::endl;
+
+    computing_timer.leave_subsection("Create snapshot");
+  }
+
+
+
+  template <int dim>
+  unsigned int Simulator<dim>::determine_last_good_snapshot() const
+  {
+    unsigned int last_checkpoint_id = numbers::invalid_unsigned_int;
+
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+      {
+        std::ifstream f (parameters.output_directory + "restart/last_good_checkpoint.txt");
+        if (f)
+          {
+            f >> last_checkpoint_id;
+            AssertThrow((last_checkpoint_id > 0) && (last_checkpoint_id < 100),
+                        ExcMessage("Could not parse the last good checkpoint from last_good_checkpoint.txt"));
+          }
+      }
+
+    return Utilities::MPI::broadcast(mpi_communicator, last_checkpoint_id, 0);
   }
 
 
@@ -464,36 +431,39 @@ namespace aspect
 #endif
 
     // Then start with the actual deserialization.
+
+    const std::string checkpoint_path = parameters.output_directory + "restart/" + Utilities::int_to_string(last_checkpoint_id, 2) + "/";
+
     // First check existence of the two restart files
-    AssertThrow (Utilities::fexists(parameters.output_directory + "restart.mesh", mpi_communicator),
+    AssertThrow (Utilities::fexists(checkpoint_path + "mesh", mpi_communicator),
                  ExcMessage ("You are trying to restart a previous computation, "
                              "but the restart file <"
                              +
-                             parameters.output_directory + "restart.mesh"
+                             checkpoint_path + "mesh"
                              +
                              "> does not appear to exist!"));
 
-    AssertThrow (Utilities::fexists(parameters.output_directory + "restart.resume.z", mpi_communicator),
+    AssertThrow (Utilities::fexists(checkpoint_path + "resume.z", mpi_communicator),
                  ExcMessage ("You are trying to restart a previous computation, "
                              "but the restart file <"
                              +
-                             parameters.output_directory + "restart.resume.z"
+                             checkpoint_path + ".resume.z"
                              +
                              "> does not appear to exist!"));
 
-    pcout << "*** Resuming from snapshot!" << std::endl << std::endl;
+    pcout << "*** Resuming from snapshot " << checkpoint_path << std::endl << std::endl;
 
     // Read resume.z to set up the state of the model
     try
       {
 #ifdef DEAL_II_WITH_ZLIB
         const std::string restart_data
-          = Utilities::read_and_distribute_file_content (parameters.output_directory + "restart.resume.z",
+          = Utilities::read_and_distribute_file_content (checkpoint_path + "resume.z",
                                                          mpi_communicator);
 
         std::istringstream ifs (restart_data);
 
-        uint32_t compression_header[4];
+        std::uint32_t compression_header[4];
         ifs.read(reinterpret_cast<char *>(compression_header), 4 * sizeof(compression_header[0]));
         Assert(compression_header[0]==1, ExcInternalError());
 
@@ -537,7 +507,7 @@ namespace aspect
     // now that we have resumed from the snapshot load the mesh and solution vectors
     try
       {
-        triangulation.load (parameters.output_directory + "restart.mesh");
+        triangulation.load (checkpoint_path + "mesh");
       }
     catch (...)
       {
@@ -564,7 +534,10 @@ namespace aspect
     if (parameters.mesh_deformation_enabled)
       x_system.push_back(&distributed_mesh_velocity);
 
-    parallel::distributed::SolutionTransfer<dim, LinearAlgebra::BlockVector>
+#if !DEAL_II_VERSION_GTE(9,7,0)
+    using namespace dealii::parallel::distributed;
+#endif
+    SolutionTransfer<dim, LinearAlgebra::BlockVector>
     system_trans (dof_handler);
 
     system_trans.deserialize (x_system);
@@ -579,7 +552,7 @@ namespace aspect
         mesh_deformation->mesh_velocity = distributed_mesh_velocity;
 
         // deserialize and copy the vectors using the mesh deformation dof handler
-        parallel::distributed::SolutionTransfer<dim, LinearAlgebra::Vector> mesh_deformation_trans( mesh_deformation->mesh_deformation_dof_handler );
+        SolutionTransfer<dim, LinearAlgebra::Vector> mesh_deformation_trans( mesh_deformation->mesh_deformation_dof_handler );
         LinearAlgebra::Vector distributed_mesh_displacements( mesh_deformation->mesh_locally_owned,
                                                               mpi_communicator );
         LinearAlgebra::Vector distributed_initial_topography( mesh_deformation->mesh_locally_owned,
@@ -635,9 +608,40 @@ namespace aspect
     ar &last_pressure_normalization_adjustment;
     ar &total_walltime_until_last_snapshot;
 
-    ar &postprocess_manager;
-
     ar &statistics;
+
+    // Serialize various plugin systems. In many cases, plugins are stateless and
+    // serialization will not do anything. But some are stateful (for example the
+    // dynamic core boundary temperature plugin) and need to be serialized.
+    ar &mesh_refinement_manager;
+    ar &heating_model_manager;
+    ar &postprocess_manager;
+    ar &boundary_temperature_manager;
+    ar &boundary_convective_heating_manager;
+    ar &boundary_composition_manager;
+    ar &prescribed_solution_manager;
+    ar &boundary_velocity_manager;
+    ar &boundary_traction_manager;
+
+// The following are not manager classes but straight up plugins and so don't
+// currently have the ability to serialize themselves. We should add those later.
+//    ar &prescribed_stokes_solution;
+//    ar &boundary_heat_flux;
+//    ar &(*adiabatic_conditions);
+//    ar &(*initial_topography_model);
+
+// Also, the following two are objects that are documented to be destroyed
+// after the first time step. One can argue that consequently they are
+// not needed any more anyway after we read a checkpoint (which is always
+// *after* a time step, i.e., not during the initial time step). But,
+// the documentation also says that *other* objects may keep a pointer
+// to them around -- we wouldn't know that here, and so we can't serialize
+// these objects here:
+//    ar &(*initial_temperature_manager);
+//    ar &(*initial_composition_manager);
+
+    if (parameters.mesh_deformation_enabled)
+      ar &(*mesh_deformation);
 
     // We do not serialize the statistics_last_write_size and
     // statistics_last_hash variables on purpose. This way, upon
@@ -655,6 +659,7 @@ namespace aspect
 namespace aspect
 {
 #define INSTANTIATE(dim) \
+  template unsigned int Simulator<dim>::determine_last_good_snapshot() const; \
   template void Simulator<dim>::create_snapshot(); \
   template void Simulator<dim>::resume_from_snapshot();
 

@@ -64,19 +64,20 @@ namespace aspect
     {
       enum Kind
       {
-        single_Advection_single_Stokes,
-        iterated_Advection_and_Stokes,
-        single_Advection_iterated_Stokes,
-        no_Advection_iterated_Stokes,
+        no_Advection_no_Stokes,
         no_Advection_single_Stokes,
+        no_Advection_single_Stokes_first_timestep_only,
+        no_Advection_iterated_Stokes,
         no_Advection_iterated_defect_correction_Stokes,
-        single_Advection_iterated_defect_correction_Stokes,
-        iterated_Advection_and_defect_correction_Stokes,
-        iterated_Advection_and_Newton_Stokes,
-        single_Advection_iterated_Newton_Stokes,
         single_Advection_no_Stokes,
-        first_timestep_only_single_Stokes,
-        no_Advection_no_Stokes
+        single_Advection_single_Stokes,
+        single_Advection_iterated_Stokes,
+        single_Advection_iterated_defect_correction_Stokes,
+        single_Advection_iterated_Newton_Stokes,
+        iterated_Advection_no_Stokes,
+        iterated_Advection_and_Stokes,
+        iterated_Advection_and_defect_correction_Stokes,
+        iterated_Advection_and_Newton_Stokes
       };
     };
 
@@ -381,6 +382,37 @@ namespace aspect
     };
 
     /**
+     * This enum represents the different choices for the linear solver
+     * for the Stoke system. See @p stokes_solver_type.
+     */
+    struct StokesGMGType
+    {
+      enum Kind
+      {
+        local_smoothing,
+        global_coarsening
+      };
+
+      static const std::string pattern()
+      {
+        return "local smoothing|global coarsening";
+      }
+
+      static Kind
+      parse(const std::string &input)
+      {
+        if (input == "local smoothing")
+          return local_smoothing;
+        else if (input == "global coarsening")
+          return global_coarsening;
+        else
+          AssertThrow(false, ExcNotImplemented());
+
+        return Kind();
+      }
+    };
+
+    /**
      * This enum represents the different choices for the Krylov method
      * used in the cheap GMG Stokes solve.
      */
@@ -470,7 +502,7 @@ namespace aspect
      * declared.
      */
     static
-    void declare_parameters (ParameterHandler &prm);
+    void declare_parameters (ParameterHandler &prm, const unsigned int mpi_rank);
 
     /**
      * Read run-time parameters from an object that has previously parsed an
@@ -556,6 +588,7 @@ namespace aspect
     bool                           use_direct_stokes_solver;
     bool                           use_bfbt;
     typename StokesSolverType::Kind stokes_solver_type;
+    typename StokesGMGType::Kind stokes_gmg_type;
     typename StokesKrylovType::Kind stokes_krylov_type;
     unsigned int                    idr_s_parameter;
 

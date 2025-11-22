@@ -30,8 +30,6 @@
 #include <aspect/geometry_model/initial_topography_model/ascii_data.h>
 #include <aspect/geometry_model/two_merged_chunks.h>
 
-#include <deal.II/base/exceptions.h>
-
 #include <boost/lexical_cast.hpp>
 #include <regex>
 
@@ -149,7 +147,7 @@ namespace aspect
     unsigned
     StructuredDataLookup<dim>::get_number_of_coordinates(const unsigned int dimension) const
     {
-      return table_points[dimension];
+      return points_per_direction[dimension];
     }
 
 
@@ -216,7 +214,7 @@ namespace aspect
               this->coordinate_values[d] = std::move(coordinate_values_[d]);
               AssertThrow(this->coordinate_values[d].size()>1,
                           ExcMessage("Error: At least 2 entries per coordinate direction are required."));
-              table_points[d] = this->coordinate_values[d].size();
+              points_per_direction[d] = this->coordinate_values[d].size();
             }
 
           n_components = column_names.size();
@@ -224,7 +222,7 @@ namespace aspect
           Assert(data_table.size() == n_components,
                  ExcMessage("Error: Incorrect number of columns specified."));
           for (unsigned int c=0; c<n_components; ++c)
-            Assert(data_table[c].size() == table_points,
+            Assert(data_table[c].size() == points_per_direction,
                    ExcMessage("Error: One of the data tables has an incorrect size."));
 
           // compute maximum_component_value for each component:
@@ -234,7 +232,7 @@ namespace aspect
               const std::size_t n_elements = data_table[c].n_elements();
               for (std::size_t idx=0; idx<n_elements; ++idx)
                 maximum_component_value[c] = std::max(maximum_component_value[c], data_table[c](
-                                                        compute_table_indices(table_points, idx)));
+                                                        compute_table_indices(points_per_direction, idx)));
             }
 
           // In case the data is specified on a grid that is equidistant
@@ -267,8 +265,8 @@ namespace aspect
           coordinate_values_are_equidistant = Utilities::MPI::broadcast (mpi_communicator,
                                                                          coordinate_values_are_equidistant,
                                                                          root_process);
-          table_points                      = Utilities::MPI::broadcast (mpi_communicator,
-                                                                         table_points,
+          points_per_direction              = Utilities::MPI::broadcast (mpi_communicator,
+                                                                         points_per_direction,
                                                                          root_process);
 
           // We can then also prepare the data tables for sharing between
@@ -281,7 +279,7 @@ namespace aspect
       Assert(data_table.size() == n_components,
              ExcMessage("Error: Incorrect number of columns specified."));
       for (unsigned int c=0; c<n_components; ++c)
-        Assert(data_table[c].size() == table_points,
+        Assert(data_table[c].size() == points_per_direction,
                ExcMessage("Error: One of the data tables has an incorrect size."));
 
 
@@ -294,14 +292,14 @@ namespace aspect
             {
               std::array<unsigned int,dim> table_intervals;
               for (unsigned int d=0; d<dim; ++d)
-                table_intervals[d] = table_points[d]-1;
+                table_intervals[d] = points_per_direction[d]-1;
 
               // The min and max of the coordinates in the data file.
               std::array<std::pair<double,double>,dim> grid_extent;
               for (unsigned int d=0; d<dim; ++d)
                 {
                   grid_extent[d].first = coordinate_values[d][0];
-                  grid_extent[d].second = coordinate_values[d][table_points[d]-1];
+                  grid_extent[d].second = coordinate_values[d][points_per_direction[d]-1];
 
                   Assert(table_intervals[d] >= 1,
                          ExcMessage("There needs to be at least one subinterval in each "
@@ -356,7 +354,7 @@ namespace aspect
         {
           // Grab the values already stored in this class (if they exist), this way we can
           // check if somebody changes the size of the table over time and error out (see below)
-          TableIndices<dim> new_table_points = this->table_points;
+          TableIndices<dim> new_points_per_direction = this->points_per_direction;
 
           // We do not need to distribute the contents as we are using shared data
           // to place it later. Therefore, just pass MPI_COMM_SELF (i.e.,
@@ -379,10 +377,10 @@ namespace aspect
                       unsigned int temp_index;
                       linestream >> temp_index;
 
-                      if (new_table_points[i] == 0)
-                        new_table_points[i] = temp_index;
+                      if (new_points_per_direction[i] == 0)
+                        new_points_per_direction[i] = temp_index;
                       else
-                        AssertThrow (new_table_points[i] == temp_index,
+                        AssertThrow (new_points_per_direction[i] == temp_index,
                                      ExcMessage("The file grid must not change over model runtime. "
                                                 "Either you prescribed a conflicting number of points in "
                                                 "the input file, or the POINTS comment in your data files "
@@ -392,7 +390,7 @@ namespace aspect
 
           for (unsigned int i = 0; i < dim; ++i)
             {
-              AssertThrow(new_table_points[i] != 0,
+              AssertThrow(new_points_per_direction[i] != 0,
                           ExcMessage("Could not successfully read in the file header of the "
                                      "ascii data file <" + filename + ">. One header line has to "
                                      "be of the format: '#POINTS: N1 [N2] [N3]', where N1 and "
@@ -444,7 +442,8 @@ namespace aspect
                     {
                       // Transform name to lower case to prevent confusion with capital letters
                       // Note: only ASCII characters allowed
-                      std::transform(column_name_or_data.begin(), column_name_or_data.end(), column_name_or_data.begin(), ::tolower);
+                      std::transform(column_name_or_data.begin(), column_name_or_data.end(), column_name_or_data.begin(),
+                                     static_cast<int (*)(int)>(std::tolower));
 
                       AssertThrow(std::find(column_names.begin(),column_names.end(),column_name_or_data)
                                   == column_names.end(),
@@ -462,7 +461,7 @@ namespace aspect
           // there is no constructor for Table, which takes TableIndices as
           // argument.
           Table<dim,double> data_table;
-          data_table.TableBase<dim,double>::reinit(new_table_points);
+          data_table.TableBase<dim,double>::reinit(new_points_per_direction);
           AssertThrow (n_components != numbers::invalid_unsigned_int,
                        ExcMessage("ERROR: number of n_components in " + filename + " could not be "
                                   "determined automatically. Either add a header with column "
@@ -471,7 +470,7 @@ namespace aspect
           data_tables.resize(n_components, data_table);
 
           for (unsigned int d=0; d<dim; ++d)
-            coordinate_values[d].resize(new_table_points[d]);
+            coordinate_values[d].resize(new_points_per_direction[d]);
 
           if (column_names.size()==0)
             {
@@ -510,7 +509,7 @@ namespace aspect
               // what row and column of the file are we in?
               const std::size_t column_num = read_data_entries%(n_components+dim);
               const std::size_t row_num = read_data_entries/(n_components+dim);
-              const TableIndices<dim> idx = compute_table_indices(new_table_points, row_num);
+              const TableIndices<dim> idx = compute_table_indices(new_points_per_direction, row_num);
 
               if (column_num < dim)
                 {
@@ -606,7 +605,7 @@ namespace aspect
       (void)data_column_names_;
       AssertThrow(false, ExcMessage("Loading NetCDF files is only supported if ASPECT is configured with the NetCDF library!"));
 #else
-      TableIndices<dim> new_table_points;
+      TableIndices<dim> new_points_per_direction;
       std::vector<std::string> coordinate_column_names(dim);
       std::vector<Table<dim,double>> data_tables;
       std::vector<std::string> data_column_names = data_column_names_;
@@ -685,7 +684,7 @@ namespace aspect
                           status = nc_inq_dim(ncid, var_dimids[i], nullptr, &length);
                           dimids_to_use[i] = var_dimids[i];
                           // dimensions are specified in reverse order in the nc file:
-                          new_table_points[dim-1-i] = length;
+                          new_points_per_direction[dim-1-i] = length;
                         }
                     }
 
@@ -747,7 +746,7 @@ namespace aspect
                               status = nc_inq_dim(ncid, var_dimids[i], nullptr, &length);
                               dimids_to_use[i] = var_dimids[i];
                               // dimensions are specified in reverse order in the nc file:
-                              new_table_points[dim-1-i] = length;
+                              new_points_per_direction[dim-1-i] = length;
                             }
                         }
 
@@ -802,7 +801,7 @@ namespace aspect
 
             AssertThrow(xtype == NC_DOUBLE || xtype == NC_FLOAT, ExcMessage("We only support float or double data."));
 
-            coordinate_values[d].resize(new_table_points[d]);
+            coordinate_values[d].resize(new_points_per_direction[d]);
             status = nc_get_var_double(ncid, varid, coordinate_values[d].data());
             AssertThrowNetCDF(status);
           }
@@ -816,7 +815,7 @@ namespace aspect
         for (unsigned int var = 0; var<varids_to_use.size(); ++var)
           {
             // Allocate space
-            data_tables[var].TableBase<dim,double>::reinit(new_table_points);
+            data_tables[var].TableBase<dim,double>::reinit(new_points_per_direction);
             const std::size_t n_elements = data_tables[var].n_elements();
             raw_data.resize(n_elements);
 
@@ -827,7 +826,7 @@ namespace aspect
             // .. and copy it over:
             for (std::size_t n = 0; n < n_elements; ++n)
               {
-                TableIndices<dim> ind = compute_table_indices(new_table_points, n);
+                TableIndices<dim> ind = compute_table_indices(new_points_per_direction, n);
                 TableIndices<dim> ind_to_use;
                 for (int i=0; i<dim; ++i)
                   ind_to_use[i] = ind[dimids_to_use[i]];
@@ -871,7 +870,7 @@ namespace aspect
         {
           const std::vector<double> &x_coordinates = get_interpolation_point_coordinates(0);
 
-          AssertThrow (position[0] >= x_coordinates[0] && position[0] <= x_coordinates[x_coordinates.size()-1],
+          AssertThrow (position[0] >= (x_coordinates[0] * (1. - 10. * std::numeric_limits<double>::epsilon())) && position[0] <= (x_coordinates[x_coordinates.size()-1] * (1. + 10. * std::numeric_limits<double>::epsilon())),
                        ExcMessage("The requested position "
                                   + std::to_string(position[0])
                                   + " is outside the range of the data (minimum value = "
@@ -883,7 +882,7 @@ namespace aspect
 
           const std::vector<double> &y_coordinates = get_interpolation_point_coordinates(1);
 
-          AssertThrow (position[1] >= y_coordinates[0] && position[1] <= y_coordinates[y_coordinates.size()-1],
+          AssertThrow (position[1] >= (y_coordinates[0] * (1. - 10. * std::numeric_limits<double>::epsilon())) && position[1] <= (y_coordinates[y_coordinates.size()-1] * (1. + 10. * std::numeric_limits<double>::epsilon())),
                        ExcMessage("The requested position "
                                   + std::to_string(position[1])
                                   + " is outside the range of the data (minimum value = "
@@ -945,7 +944,10 @@ namespace aspect
                            "text `$ASPECT_SOURCE_DIR' which will be interpreted as the path "
                            "in which the ASPECT source files were located when ASPECT was "
                            "compiled. This interpretation allows, for example, to reference "
-                           "files located in the `data/' subdirectory of ASPECT.");
+                           "files located in the `data/' subdirectory of ASPECT. A trailing "
+                           "slash at the end of the directory path is optional; the plugin "
+                           "will automatically append a '/' when the parameters are parsed if "
+                           "it is missing.");
         prm.declare_entry ("Data file name",
                            default_filename,
                            Patterns::Anything (),
@@ -973,6 +975,9 @@ namespace aspect
         // to $ASPECT_SOURCE_DIR, replace it by what CMake has given us
         // as a #define
         data_directory = Utilities::expand_ASPECT_SOURCE_DIR(prm.get ("Data directory"));
+        // ensure directory ends with a slash so callers can safely do data_directory + filename
+        if (!data_directory.empty() && data_directory.back() != '/')
+          data_directory.push_back('/');
         data_file_name    = prm.get ("Data file name");
         scale_factor      = prm.get_double ("Scale factor");
       }
@@ -1098,17 +1103,17 @@ namespace aspect
                                        const int filenumber)
       {
         const int maxsize = filename_and_path.length() + 256;
-        char *filename = static_cast<char *>(malloc (maxsize * sizeof(char)));
-        int ret = snprintf (filename,
-                            maxsize,
-                            filename_and_path.c_str(),
-                            boundary_name.c_str(),
-                            filenumber);
+        char *filename = static_cast<char *>(std::malloc (maxsize * sizeof(char)));
+        int ret = std::snprintf (filename,
+                                 maxsize,
+                                 filename_and_path.c_str(),
+                                 boundary_name.c_str(),
+                                 filenumber);
 
         AssertThrow(ret >= 0, ExcMessage("Invalid string placeholder in filename detected."));
         AssertThrow(ret< maxsize, ExcInternalError("snprintf string overflow detected."));
         const std::string str_result (filename);
-        free (filename);
+        std::free (filename);
         return str_result;
       }
 
@@ -1482,7 +1487,7 @@ namespace aspect
             prm.declare_entry ("Data file time step", "1e6",
                                Patterns::Double (0.),
                                "Time step between following data files. "
-                               "Depending on the setting of the global `Use years in output instead of seconds' flag "
+                               "Depending on the setting of the global `Use years instead of seconds' flag "
                                "in the input file, this number is either interpreted as seconds or as years. "
                                "The default is one million, i.e., either one million seconds or one million years.");
             prm.declare_entry ("First data file model time", "0",
@@ -1584,7 +1589,7 @@ namespace aspect
       number_of_layer_boundaries = data_file_names.size();
       for (unsigned int i=0; i<number_of_layer_boundaries; ++i)
         {
-          const std::string filename = data_directory + data_file_names[i];
+          const std::string filename = this->data_directory + data_file_names[i];
           AssertThrow(Utilities::fexists(filename, this->get_mpi_communicator()) || filename_is_url(filename),
                       ExcMessage (std::string("Ascii data file <")
                                   +
@@ -1672,17 +1677,6 @@ namespace aspect
 
       prm.enter_subsection (subsection_name);
       {
-        prm.declare_entry ("Data directory",
-                           default_directory,
-                           Patterns::DirectoryName (),
-                           "The name of a directory that contains the model data. This path "
-                           "may either be absolute (if starting with a `/') or relative to "
-                           "the current directory. The path may also include the special "
-                           "text `$ASPECT_SOURCE_DIR' which will be interpreted as the path "
-                           "in which the ASPECT source files were located when ASPECT was "
-                           "compiled. This interpretation allows, for example, to reference "
-                           "files located in the `data/' subdirectory of ASPECT. ");
-
         prm.declare_entry ("Data file names",
                            default_filename,
                            Patterns::List (Patterns::Anything()),
@@ -1711,7 +1705,6 @@ namespace aspect
 
       prm.enter_subsection(subsection_name);
       {
-        data_directory = Utilities::expand_ASPECT_SOURCE_DIR(prm.get ("Data directory"));
         data_file_names = Utilities::split_string_list(prm.get ("Data file names"), ',');
         interpolation_scheme = prm.get("Interpolation scheme");
       }

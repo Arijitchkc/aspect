@@ -22,7 +22,6 @@
 #include <aspect/geometry_model/spherical_shell.h>
 #include <aspect/geometry_model/initial_topography_model/zero_topography.h>
 
-#include <aspect/compat.h>
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
@@ -54,12 +53,12 @@ namespace aspect
     {
       template <int dim>
       SphericalManifoldWithTopography<dim>::
-      SphericalManifoldWithTopography(const InitialTopographyModel::Interface<dim> &topography,
+      SphericalManifoldWithTopography(const std::shared_ptr<const InitialTopographyModel::Interface<dim>> topography,
                                       const double inner_radius,
                                       const double outer_radius)
         :
         SphericalManifold<dim>(Point<dim>()),
-        topo (&topography),
+        topo (topography),
         R0 (inner_radius),
         R1 (outer_radius)
       {}
@@ -79,12 +78,10 @@ namespace aspect
       SphericalManifoldWithTopography<dim>::
       topography_for_point(const Point<dim> &x_y_z) const
       {
-        if (dynamic_cast<const InitialTopographyModel::ZeroTopography<dim>*>(topo) != nullptr)
+        if (dynamic_cast<const InitialTopographyModel::ZeroTopography<dim>*>(topo.get()) != nullptr)
           return 0;
         else
           {
-            Assert (dim==3, ExcNotImplemented());
-
             // The natural coordinate system of the sphere geometry is r/phi/theta.
             // This is what we need to query the topography with. So start by
             // converting into this coordinate system
@@ -286,7 +283,7 @@ namespace aspect
     void
     SphericalShell<dim>::initialize ()
     {
-      manifold = std::make_unique<internal::SphericalManifoldWithTopography<dim>>(this->get_initial_topography_model(),
+      manifold = std::make_unique<internal::SphericalManifoldWithTopography<dim>>(this->get_initial_topography_model_pointer(),
                                                                                    R0, R1);
     }
 
@@ -448,6 +445,17 @@ namespace aspect
                                               R1,
                                               0,
                                               true);
+
+          // there was a bug with boundary colorization of thin shells
+          // before deal.II 9.7. Use a fixed version of that function,
+          // for deal.II versions that need it.
+#if !DEAL_II_VERSION_GTE(9,7,0)
+          if (dim == 3)
+            colorize_quarter_hyper_shell(coarse_grid,
+                                         Point<dim>(),
+                                         R0,
+                                         R1);
+#endif
 
           if (periodic)
             {
@@ -673,7 +681,11 @@ namespace aspect
     double
     SphericalShell<dim>::depth(const Point<dim> &position) const
     {
-      return std::min (std::max (R1-position.norm(), 0.), maximal_depth());
+      if (this->simulator_is_past_initialization() &&
+          !Plugins::plugin_type_matches<const InitialTopographyModel::ZeroTopography<dim>>(this->get_initial_topography_model()))
+        return std::min(std::max (R1 + manifold->topography_for_point(position) - position.norm(), 0.), maximal_depth());
+      else
+        return std::min (std::max (R1-position.norm(), 0.), maximal_depth());
     }
 
 
@@ -699,10 +711,9 @@ namespace aspect
       // Choose a point along the axes toward the north pole, at the
       // requested depth.
       Point<dim> p;
-      p[dim-1] = std::min (std::max(R1 - depth, R0), R1);
 
-      // Return this point. This ignores the surface topography,
-      // but that is as documented.
+      p[dim-1] = std::min (std::max(R1 + manifold->topography_for_point(p) - depth, R0), R1);
+
       return p;
     }
 
@@ -712,12 +723,7 @@ namespace aspect
     double
     SphericalShell<dim>::maximal_depth() const
     {
-      // The depth is defined as relative to a reference surface (without
-      // topography) and since we don't apply topography on the CMB,
-      // the maximal depth really is R1-R0 unless one applies a
-      // topography that is always strictly below zero (i.e., where the
-      // actual surface lies strictly below the reference surface).
-      return R1-R0;
+      return R1 + this->get_initial_topography_model().max_topography() - R0;
     }
 
 
@@ -763,14 +769,15 @@ namespace aspect
                   this->simulator_is_past_initialization() == false,
                   ExcMessage("After displacement of the free surface, this function can no longer be used to determine whether a point lies in the domain or not."));
 
-      AssertThrow(Plugins::plugin_type_matches<const InitialTopographyModel::ZeroTopography<dim>>(this->get_initial_topography_model()),
-                  ExcMessage("After adding topography, this function can no longer be used to determine whether a point lies in the domain or not."));
-
       const std::array<double, dim> spherical_point = Utilities::Coordinates::cartesian_to_spherical_coordinates(point);
 
       std::array<double, dim> point1, point2;
       point1[0] = R0;
-      point2[0] = R1;
+      if (this->simulator_is_past_initialization() &&
+          !Plugins::plugin_type_matches<const InitialTopographyModel::ZeroTopography<dim>>(this->get_initial_topography_model()))
+        point2[0] =  R1 + manifold->topography_for_point(point);
+      else
+        point2[0] = R1;
       point1[1] = 0.0;
       point2[1] = phi * constants::degree_to_radians;
       if (dim == 3)
@@ -790,8 +797,6 @@ namespace aspect
             spherical_point[d] < point1[d]-std::numeric_limits<double>::epsilon()*std::abs(point2[d]))
           return false;
 
-      // TODO: Take into account topography
-
       return true;
     }
 
@@ -801,7 +806,6 @@ namespace aspect
     std::array<double,dim>
     SphericalShell<dim>::cartesian_to_natural_coordinates(const Point<dim> &position) const
     {
-      // TODO: Take into account topography
       return Utilities::Coordinates::cartesian_to_spherical_coordinates<dim>(position);
     }
 
@@ -820,7 +824,6 @@ namespace aspect
     Point<dim>
     SphericalShell<dim>::natural_to_cartesian_coordinates(const std::array<double,dim> &position) const
     {
-      // TODO: Take into account topography
       return Utilities::Coordinates::spherical_to_cartesian_coordinates<dim>(position);
     }
 

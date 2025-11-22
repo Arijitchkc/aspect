@@ -1,3 +1,12 @@
+```{tags}
+category:cookbook
+category:benchmark
+feature:2d
+feature:cartesian
+feature:community-benchmark
+```
+
+(sec:cookbooks:vankeken-2008-benchmark)=
 # Van Keken 2008 corner flow recreation
 
 *This section was contributed by Daniel Douglas, Cedric Thieulot, Wolfgang Bangerth, and Max Rudolph.*

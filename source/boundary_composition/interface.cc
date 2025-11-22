@@ -25,10 +25,9 @@
 #include <aspect/utilities.h>
 #include <aspect/simulator_access.h>
 
-#include <deal.II/base/exceptions.h>
 #include <deal.II/base/signaling_nan.h>
-#include <tuple>
 
+#include <tuple>
 #include <list>
 
 
@@ -117,7 +116,7 @@ namespace aspect
           }
         catch (const std::string &error)
           {
-            AssertThrow (false, ExcMessage ("While parsing the entry <Model settings/Fixed composition "
+            AssertThrow (false, ExcMessage ("While parsing the entry <Boundary composition model/Fixed composition "
                                             "boundary indicators>, there was an error. Specifically, "
                                             "the conversion function complained as follows:\n\n"
                                             + error));

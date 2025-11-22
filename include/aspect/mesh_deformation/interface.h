@@ -37,7 +37,6 @@
 #include <deal.II/multigrid/mg_transfer_global_coarsening.templates.h>
 #include <aspect/simulator/assemblers/interface.h>
 
-
 namespace aspect
 {
   namespace Assemblers
@@ -119,7 +118,7 @@ namespace aspect
         void
         compute_velocity_constraints_on_boundary(const DoFHandler<dim> &mesh_deformation_dof_handler,
                                                  AffineConstraints<double> &mesh_velocity_constraints,
-                                                 const std::set<types::boundary_id> &boundary_id) const;
+                                                 const std::set<types::boundary_id> &boundary_ids) const;
     };
 
 
@@ -191,6 +190,24 @@ namespace aspect
          * Parse parameters for the mesh deformation handling.
          */
         void parse_parameters (ParameterHandler &prm);
+
+        /**
+         * Write the data of this object to a stream for the purpose of
+         * serialization.
+         */
+        template <class Archive>
+        void save (Archive &ar,
+                   const unsigned int version) const;
+
+        /**
+         * Read the data of this object from a stream for the purpose of
+         * serialization.
+         */
+        template <class Archive>
+        void load (Archive &ar,
+                   const unsigned int version);
+
+        BOOST_SERIALIZATION_SPLIT_MEMBER()
 
         /**
          * A function that is used to register mesh deformation objects in such
@@ -569,6 +586,42 @@ namespace aspect
         friend class Simulator<dim>;
         friend class SimulatorAccess<dim>;
     };
+
+
+    template <int dim>
+    template <class Archive>
+    void MeshDeformationHandler<dim>::save (Archive &ar,
+                                            const unsigned int) const
+    {
+      // let all the mesh deformation plugins save their data in a map and then
+      // serialize that
+      //TODO: for now we assume the same plugins are active before and after restart.
+      std::map<std::string,std::string> saved_text;
+      for (const auto &boundary_id_and_mesh_deformation_objects : mesh_deformation_objects)
+        for (const auto &p : boundary_id_and_mesh_deformation_objects.second)
+          p->save (saved_text);
+
+      ar &saved_text;
+    }
+
+
+    template <int dim>
+    template <class Archive>
+    void MeshDeformationHandler<dim>::load (Archive &ar,
+                                            const unsigned int)
+    {
+      // get the map back out of the stream; then let the mesh deformation plugins
+      // that we currently have get their data from there. note that this
+      // may not be the same set ofmesh deformation plugins we had when we saved
+      // their data
+      std::map<std::string,std::string> saved_text;
+      ar &saved_text;
+
+      for (const auto &boundary_id_and_mesh_deformation_objects : mesh_deformation_objects)
+        for (const auto &p : boundary_id_and_mesh_deformation_objects.second)
+          p->load (saved_text);
+    }
+
 
 
 

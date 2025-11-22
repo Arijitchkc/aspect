@@ -25,10 +25,9 @@
 #include <aspect/heating_model/adiabatic_heating.h>
 #include <aspect/heating_model/shear_heating.h>
 
-#include <deal.II/base/exceptions.h>
 #include <deal.II/base/signaling_nan.h>
-#include <tuple>
 
+#include <tuple>
 #include <list>
 
 
@@ -49,6 +48,16 @@ namespace aspect
     Interface<dim>::
     create_additional_material_model_inputs(MaterialModel::MaterialModelInputs<dim> & /*inputs*/) const
     {}
+
+
+    template <int dim>
+    MaterialModel::MaterialProperties::Property
+    Interface<dim>::
+    get_required_properties() const
+    {
+      return MaterialModel::MaterialProperties::all_properties;
+    }
+
 
 
     // ------------------------------ Manager -----------------------------
@@ -150,9 +159,6 @@ namespace aspect
       HeatingModel::HeatingModelOutputs individual_heating_outputs(material_model_inputs.n_evaluation_points(),
                                                                    this->n_compositional_fields());
 
-      const MaterialModel::ReactionRateOutputs<dim> *reaction_rate_outputs
-        = material_model_outputs.template get_additional_output<MaterialModel::ReactionRateOutputs<dim>>();
-
       for (const auto &heating_model : this->plugin_objects)
         {
           heating_model->evaluate(material_model_inputs, material_model_outputs, individual_heating_outputs);
@@ -173,6 +179,9 @@ namespace aspect
       // If the heating model does not get the reaction rate outputs, it can not correctly compute
       // the rates of temperature change. To make sure these (incorrect) values are never used anywhere,
       // overwrite them with signaling_NaNs.
+      const std::shared_ptr<const MaterialModel::ReactionRateOutputs<dim>> reaction_rate_outputs
+        = material_model_outputs.template get_additional_output_object<MaterialModel::ReactionRateOutputs<dim>>();
+
       if (reaction_rate_outputs == nullptr)
         for (double &q : heating_model_outputs.rates_of_temperature_change)
           q = numbers::signaling_nan<double>();
@@ -193,7 +202,8 @@ namespace aspect
 
       for (const auto &heating_model : this->plugin_objects)
         {
-          heating_model->create_additional_material_model_outputs(material_model_outputs);
+          if ((heating_model->get_required_properties() & MaterialModel::MaterialProperties::additional_outputs) != 0)
+            heating_model->create_additional_material_model_outputs(material_model_outputs);
         }
     }
 

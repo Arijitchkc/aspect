@@ -201,7 +201,7 @@ Once derivatives are used in a Newton method, ASPECT always uses the Eisenstat W
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** Set a time step size for computing reactions of compositional fields and the temperature field in case operator splitting is used. This is only used when the parameter &ldquo;Use operator splitting&rdquo; is set to true and when the &lsquo;fixed step&rsquo; reaction solver type is used. The reaction time step must be greater than 0. If you want to prescribe the reaction time step only as a relative value compared to the advection time step as opposed to as an absolute value, you should use the parameter &ldquo;Reaction time steps per advection step&rdquo; and set this parameter to the same (or larger) value as the &ldquo;Maximum time step&rdquo; (which is 5.69e+300 by default). Units: Years or seconds, depending on the &ldquo;Use years in output instead of seconds&rdquo; parameter.
+**Documentation:** Set a time step size for computing reactions of compositional fields and the temperature field in case operator splitting is used. This is only used when the parameter &ldquo;Use operator splitting&rdquo; is set to true and when the &lsquo;fixed step&rsquo; reaction solver type is used. The reaction time step must be greater than 0. If you want to prescribe the reaction time step only as a relative value compared to the advection time step as opposed to as an absolute value, you should use the parameter &ldquo;Reaction time steps per advection step&rdquo; and set this parameter to the same (or larger) value as the &ldquo;Maximum time step&rdquo; (which is 5.69e+300 by default). Units: Years or seconds, depending on the &ldquo;Use years instead of seconds&rdquo; parameter.
 
 (parameters:Solver_20parameters/Operator_20splitting_20parameters/Reaction_20time_20steps_20per_20advection_20step)=
 ### __Parameter name:__ Reaction time steps per advection step
@@ -286,6 +286,14 @@ In practice, you should choose the value of this parameter to be so that if you 
 **Pattern:** [Integer range 0...2147483647 (inclusive)]
 
 **Documentation:** As explained in the paper that describes ASPECT (Kronbichler, Heister, and Bangerth, 2012, see {cite}`kronbichler:etal:2012`) we first try to solve the Stokes system in every time step using a GMRES iteration with a poor but cheap preconditioner. By default, we try whether we can converge the GMRES solver in 200 such iterations before deciding that we need a better preconditioner. This is sufficient for simple problems with variable viscosity and we never need the second phase with the more expensive preconditioner. On the other hand, for more complex problems, and in particular for problems with strongly nonlinear viscosity, the 200 cheap iterations don&rsquo;t actually do very much good and one might skip this part right away. In that case, this parameter can be set to zero, i.e., we immediately start with the better but more expensive preconditioner.
+
+(parameters:Solver_20parameters/Stokes_20solver_20parameters/Stokes_20GMG_20type)=
+### __Parameter name:__ Stokes GMG type
+**Default value:** local smoothing
+
+**Pattern:** [Selection local smoothing|global coarsening ]
+
+**Documentation:** The choice of geometric multigrid, either &rsquo;local smoothing&rsquo; (the default)  or &rsquo;global coarsening&rsquo;. Local smoothing ({cite}`clevenger:heister:2021`) has been extensively tested and works in many more situations, while global coarsening is shown to be up to 3x faster ({cite}`munch:globalcoarsening:2023`).
 
 (parameters:Solver_20parameters/Stokes_20solver_20parameters/Stokes_20solver_20type)=
 ### __Parameter name:__ Stokes solver type

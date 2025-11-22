@@ -24,7 +24,6 @@
 #include <aspect/particle/property/interface.h>
 #include <aspect/particle/property/crystal_preferred_orientation.h>
 #include <aspect/simulator_access.h>
-#include <array>
 
 namespace aspect
 {
@@ -161,6 +160,7 @@ namespace aspect
            */
           SymmetricTensor<2,6> stiffness_matrix_olivine;
           SymmetricTensor<2,6> stiffness_matrix_enstatite;
+          SymmetricTensor<2,6> stiffness_matrix_clinopyroxene;
 
           /**
            * The number of grains per particle.

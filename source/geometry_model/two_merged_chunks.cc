@@ -43,7 +43,7 @@ namespace aspect
                   Plugins::plugin_type_matches<const InitialTopographyModel::AsciiData<dim>>(this->get_initial_topography_model()),
                   ExcMessage("At the moment, only the Zero or AsciiData initial topography model can be used with the TwoMergedChunks geometry model."));
 
-      manifold = std::make_unique<internal::ChunkGeometry<dim>>(this->get_initial_topography_model(),
+      manifold = std::make_unique<internal::ChunkGeometry<dim>>(this->get_initial_topography_model_pointer(),
                                                                  point1[1],
                                                                  point1[0],
                                                                  point2[0]-point1[0]);
@@ -129,10 +129,7 @@ namespace aspect
     set_boundary_indicators (parallel::distributed::Triangulation<dim> &triangulation) const
     {
       // Iterate over all active cells and (re)set the boundary indicators.
-      for (typename Triangulation<dim>::active_cell_iterator
-           cell = triangulation.begin_active();
-           cell != triangulation.end();
-           ++cell)
+      for (const auto &cell : triangulation.active_cell_iterators())
         {
           // First set the default boundary indicators.
           for (const unsigned int f : cell->face_indices())
@@ -249,8 +246,12 @@ namespace aspect
     TwoMergedChunks<dim>::depth(const Point<dim> &position) const
     {
       // depth is defined wrt the reference surface point2[0]
-      // negative depth is not allowed
-      return std::max (0., std::min (point2[0]-position.norm(), maximal_depth()));
+      // plus initial topography. Negative depth is not allowed.
+      if (this->simulator_is_past_initialization() &&
+          !Plugins::plugin_type_matches<const InitialTopographyModel::ZeroTopography<dim>>(this->get_initial_topography_model()))
+        return std::min(std::max(point2[0]+ manifold->topography_for_point(position) - position.norm(), 0.), maximal_depth());
+      else
+        return std::min(std::max(point2[0]-position.norm(), 0.), maximal_depth());
     }
 
 
@@ -276,7 +277,7 @@ namespace aspect
       // Choose a point at the mean longitude (and latitude)
       Point<dim> p = 0.5*(point2+point1);
       // at a depth beneath the top surface
-      p[0] = point2[0]-depth;
+      p[0] = point2[0]+manifold->topography_for_point(p) - depth;
 
       // Now convert to Cartesian coordinates
       return manifold->push_forward_sphere(p);
@@ -351,7 +352,7 @@ namespace aspect
     double
     TwoMergedChunks<dim>::maximal_depth() const
     {
-      return point2[0]-point1[0];
+      return point2[0] + this->get_initial_topography_model().max_topography() - point1[0];
     }
 
 
@@ -392,9 +393,6 @@ namespace aspect
                   this->get_timestep_number() == 0 ||
                   this->get_timestep_number() == numbers::invalid_unsigned_int,
                   ExcMessage("After displacement of the mesh, this function can no longer be used to determine whether a point lies in the domain or not."));
-
-      AssertThrow(Plugins::plugin_type_matches<const InitialTopographyModel::ZeroTopography<dim>>(this->get_initial_topography_model()),
-                  ExcMessage("After adding topography, this function can no longer be used to determine whether a point lies in the domain or not."));
 
       const Point<dim> spherical_point = manifold->pull_back(point);
 

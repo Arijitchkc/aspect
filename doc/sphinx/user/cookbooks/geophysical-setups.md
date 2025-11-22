@@ -95,6 +95,7 @@ cookbooks/shell_simple_2d/doc/shell_simple_2d.md
 cookbooks/shell_simple_3d/doc/shell_simple_3d.md
 cookbooks/shell_3d_postprocess/doc/shell_3d_postprocess.md
 cookbooks/initial-condition-S20RTS/doc/initial-condition-S20RTS.md
+cookbooks/global_regional_coupling/doc/global_regional_coupling.md
 cookbooks/gplates/doc/gplates.md
 cookbooks/burnman/doc/burnman.md
 cookbooks/steinberger/doc/steinberger.md
@@ -111,11 +112,15 @@ cookbooks/transform_fault_behn_2007/doc/transform_fault_behn_2007.md
 cookbooks/kinematically_driven_subduction_2d/doc/kinematically_driven_subduction_2d.md
 cookbooks/allken_et_al_2012_rift_interaction/doc/allken.md
 cookbooks/tian_parameterization_kinematic_slab/doc/tian_parameterization_kinematic_slab.md
+cookbooks/phase_transition_kinetics/doc/phase-transition-kinetics.md
 cookbooks/mantle_convection_with_continents_in_annulus/doc/mantle_convection_in_annulus.md
 cookbooks/inclusions/doc/inclusions.md
 cookbooks/subduction_initiation/doc/subduction_initiation.md
 cookbooks/vankeken_subduction/doc/vankeken_subduction.md
 cookbooks/2d_annulus_visualization/doc/2d_annulus_visualization.md
 cookbooks/tomography_based_plate_motions/doc/tomography_based_plate_motions.md
+cookbooks/crystal_preferred_orientation_olivine_fraters_billen_2021/doc/crystal_preferred_orientation_olivine_fraters_billen_2021.md
+cookbooks/sinking_of_anhydrite_block_in_salt_diapir/doc/sinking_of_anhydrite_block_in_salt_diapir.md
+cookbooks/anisotropic_viscosity/doc/anisotropic_viscosity.md
 cookbooks/future/README.md
 :::

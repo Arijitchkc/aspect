@@ -36,7 +36,6 @@
 #include <boost/archive/text_iarchive.hpp>
 
 #include <cmath>
-#include <cstdio>
 #include <unistd.h>
 
 #include <algorithm>
@@ -263,19 +262,6 @@ namespace aspect
 
 
       template <int dim>
-      void
-      Interface<dim>::save (std::map<std::string,std::string> &) const
-      {}
-
-
-      template <int dim>
-      void
-      Interface<dim>::load (const std::map<std::string,std::string> &)
-      {}
-
-
-
-      template <int dim>
       CellDataVectorCreator<dim>::CellDataVectorCreator (const std::string &physical_units)
         :
         Interface<dim> (physical_units)
@@ -434,6 +420,8 @@ namespace aspect
                                        (is_cell_data_output ? "solution.visit" : "solution_surface.visit"));
 
       std::vector<std::pair<double, std::vector<std::string>>> times_and_output_file_names;
+      const auto n_file_names = output_history.times_and_pvtu_names.size();
+      times_and_output_file_names.reserve(n_file_names);
       for (unsigned int timestep=0; timestep<output_history.times_and_pvtu_names.size(); ++timestep)
         times_and_output_file_names.push_back(std::make_pair(output_history.times_and_pvtu_names[timestep].first,
                                                              output_history.output_file_names_by_timestep[timestep]));
@@ -549,6 +537,7 @@ namespace aspect
               const unsigned int n_files =
                 (group_files == 0) ?
                 n_processes : std::min(group_files, n_processes);
+              filenames.reserve(n_files);
               for (unsigned int i = 0; i < n_files; ++i)
                 filenames.push_back(
                   solution_file_prefix + "."
@@ -1097,7 +1086,7 @@ namespace aspect
       if (tmp_filename != filename)
         {
           std::string command = std::string("mv ") + tmp_filename + " " + filename;
-          int error = system(command.c_str());
+          int error = std::system(command.c_str());
 
           AssertThrow(error == 0,
                       ExcMessage("Could not move " + tmp_filename + " to "
@@ -1131,7 +1120,7 @@ namespace aspect
                              "graphical output files. A value of zero indicates "
                              "that output should be generated in each time step. "
                              "Units: years if the "
-                             "'Use years in output instead of seconds' parameter is set; "
+                             "'Use years instead of seconds' parameter is set; "
                              "seconds otherwise.");
 
           prm.declare_entry ("Time steps between graphical output", boost::lexical_cast<std::string>(std::numeric_limits<int>::max()),
@@ -1293,12 +1282,9 @@ namespace aspect
                             "but all boundaries of the domain. ");
 
           // Finally also construct a string for Patterns::MultipleSelection that
-          // contains the names of all registered visualization postprocessors.
-          // Also add a number of removed plugins that are now combined in 'material properties'
-          // to keep compatibility with input files. These will be filtered out in parse_parameters().
+          // contains the names of all registered visualization postprocessors
           const std::string pattern_of_names
-            = std::get<dim>(registered_visualization_plugins).get_pattern_of_names ()
-              + "|density|specific heat|thermal conductivity|thermal diffusivity|thermal expansivity|viscosity";
+            = std::get<dim>(registered_visualization_plugins).get_pattern_of_names ();
           prm.declare_entry("List of output variables",
                             "",
                             Patterns::MultipleSelection(pattern_of_names),
@@ -1373,7 +1359,7 @@ namespace aspect
               // null pointer. System is guaranteed to return non-zero if it finds
               // a terminal and zero if there is none (like on the compute nodes of
               // some cluster architectures, e.g. IBM BlueGene/Q)
-              AssertThrow(system((char *)nullptr) != 0,
+              AssertThrow(std::system((char *)nullptr) != 0,
                           ExcMessage("Usage of a temporary storage location is only supported if "
                                      "there is a terminal available to move the files to their final location "
                                      "after writing. The system() command did not succeed in finding such a terminal."));
@@ -1414,27 +1400,8 @@ namespace aspect
                          "all") != viz_names.end())
             {
               viz_names.clear();
-              for (typename std::list<typename aspect::internal::Plugins::PluginList<VisualizationPostprocessors::Interface<dim>>::PluginInfo>::const_iterator
-                   p = std::get<dim>(registered_visualization_plugins).plugins->begin();
-                   p != std::get<dim>(registered_visualization_plugins).plugins->end(); ++p)
-                viz_names.push_back (std::get<0>(*p));
-            }
-
-          // TODO: Remove deprecated options
-          const std::set<std::string> deprecated_postprocessors = {"density",
-                                                                   "specific heat",
-                                                                   "thermal conductivity",
-                                                                   "thermal diffusivity",
-                                                                   "thermal expansivity",
-                                                                   "viscosity"
-                                                                  };
-
-          for (const auto &viz_name: viz_names)
-            {
-              // Check if the current name is in the set of the deprecated names
-              AssertThrow(deprecated_postprocessors.count(viz_name) == 0,
-                          ExcMessage("The visualization postprocessor '" + viz_name + "' has been removed. "
-                                     "Please use the 'material properties' postprocessor instead."));
+              for (const auto &p : *std::get<dim>(registered_visualization_plugins).plugins)
+                viz_names.push_back (std::get<0>(p));
             }
         }
         prm.leave_subsection();
@@ -1501,6 +1468,13 @@ namespace aspect
     void
     Visualization<dim>::save (std::map<std::string, std::string> &status_strings) const
     {
+      // First let all the visualization postprocessors save their data in a
+      // map that we can then serialize:
+      std::map<std::string,std::string> saved_postprocessors;
+      for (const auto &p : postprocessors)
+        p->save (saved_postprocessors);
+
+
       // Serialize into a stringstream. Put the following into a code
       // block of its own to ensure the destruction of the 'oa'
       // archive triggers a flush() on the stringstream so we can
@@ -1509,11 +1483,10 @@ namespace aspect
       {
         aspect::oarchive oa (os);
         oa << (*this);
+        oa << saved_postprocessors;
       }
 
       status_strings["Visualization"] = os.str();
-
-//TODO: do something about the visualization postprocessor plugins
     }
 
 
@@ -1527,9 +1500,14 @@ namespace aspect
           std::istringstream is (status_strings.find("Visualization")->second);
           aspect::iarchive ia (is);
           ia >> (*this);
-        }
 
-//TODO: do something about the visualization postprocessor plugins
+          // Now also retrieve information about visualization postprocessors we
+          // may have serialized
+          std::map<std::string,std::string> saved_postprocessors;
+          ia >> saved_postprocessors;
+          for (auto &p : postprocessors)
+            p->load (saved_postprocessors);
+        }
     }
 
 

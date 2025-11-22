@@ -55,7 +55,7 @@ Gravity is expected to point along the depth direction.
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** Time step between following data files. Depending on the setting of the global &lsquo;Use years in output instead of seconds&rsquo; flag in the input file, this number is either interpreted as seconds or as years. The default is one million, i.e., either one million seconds or one million years.
+**Documentation:** Time step between following data files. Depending on the setting of the global &lsquo;Use years instead of seconds&rsquo; flag in the input file, this number is either interpreted as seconds or as years. The default is one million, i.e., either one million seconds or one million years.
 
 (parameters:Boundary_20traction_20model/Ascii_20data_20model/Decreasing_20file_20order)=
 ### __Parameter name:__ Decreasing file order
@@ -81,6 +81,14 @@ Gravity is expected to point along the depth direction.
 
 **Documentation:** Number of the first velocity file to be loaded when the model time is larger than &lsquo;First velocity file model time&rsquo;.
 
+(parameters:Boundary_20traction_20model/Ascii_20data_20model/Prescribe_20pressure_20instead_20of_20full_20traction)=
+### __Parameter name:__ Prescribe pressure instead of full traction
+**Default value:** true
+
+**Pattern:** [Bool]
+
+**Documentation:** Whether to prescribe pressure (true) or full traction vector (false) at the boundary. If true, only 1 component will be used for the boundary condition.
+
 (parameters:Boundary_20traction_20model/Ascii_20data_20model/Scale_20factor)=
 ### __Parameter name:__ Scale factor
 **Default value:** 1.
@@ -88,6 +96,14 @@ Gravity is expected to point along the depth direction.
 **Pattern:** [Double -MAX_DOUBLE...MAX_DOUBLE (inclusive)]
 
 **Documentation:** Scalar factor, which is applied to the model data. You might want to use this to scale the input to a reference model. Another way to use this factor is to convert units of the input files. For instance, if you provide velocities in cm/yr set this factor to 0.01.
+
+(parameters:Boundary_20traction_20model/Ascii_20data_20model/Use_20spherical_20unit_20vectors)=
+### __Parameter name:__ Use spherical unit vectors
+**Default value:** false
+
+**Pattern:** [Bool]
+
+**Documentation:** Specify traction as r, phi, and theta components instead of x, y, and z. Positive tractions point up, east, and north (in 3d) or out and clockwise (in 2d). This setting only makes sense for spherical geometries.
 
 (parameters:Boundary_20traction_20model/Function)=
 ## **Subsection:** Boundary traction model / Function

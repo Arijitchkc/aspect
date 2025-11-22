@@ -109,6 +109,18 @@ namespace aspect
 
 
       template <int dim>
+      AdvectionField
+      CompositionReaction<dim>::advection_field_for_boundary_initialization (const unsigned int property_component) const
+      {
+        Assert (property_component < this->n_compositional_fields(),
+                ExcInternalError());
+
+        return AdvectionField::composition(property_component);
+      }
+
+
+
+      template <int dim>
       UpdateTimeFlags
       CompositionReaction<dim>::need_update() const
       {
@@ -160,8 +172,8 @@ namespace aspect
                              "List a specific point in time when each reaction should occur during "
                              "the simulation. If set to zero, the reaction occurs throughout the "
                              "whole simulation."
-                             "Units: yr or s, depending on the ``Use years "
-                             "in output instead of seconds'' parameter.");
+                             "Units: yr or s, depending on the ``Use years instead of seconds'' "
+                             "parameter.");
 
           prm.enter_subsection("Reaction area function");
           {
@@ -230,8 +242,8 @@ namespace aspect
                            (Utilities::split_string_list(prm.get ("List of reaction times")));
 
           if (this->convert_output_to_years() == true)
-            for (unsigned int i=0; i<reaction_times.size(); ++i)
-              reaction_times[i] *= year_in_seconds;
+            for (double &time : reaction_times)
+              time *= year_in_seconds;
 
           AssertThrow ((reactants.size() == products.size()),
                        ExcMessage ("The list of reactants and products need to have the "

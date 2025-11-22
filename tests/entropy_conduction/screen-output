@@ -1,6 +1,4 @@
 
-Loading shared library <./libentropy_conduction.debug.so>
-
 Number of active cells: 200 (on 1 levels)
 Number of degrees of freedom: 6,417 (2,406+402+1,203+1,203+1,203)
 
@@ -8,23 +6,25 @@ Number of degrees of freedom: 6,417 (2,406+402+1,203+1,203+1,203)
    Copying properties into prescribed temperature field... done.
    Solving temperature system... 0 iterations.
    Solving entropy system ... 0 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
-   Solving Stokes system (GMG)... 1000+6 iterations.
-      Relative nonlinear residuals (temperature, compositional fields, Stokes system): 1.72844e-16, 1.68996e-16, 0, 0.000200925
+   Solving Stokes system (GMG)... 1000+5 iterations.
+      Relative nonlinear residuals (temperature, compositional fields, Stokes system): 1.69925e-16, 1.64537e-16, 0, 0.000200925
       Relative nonlinear residual (total system) after nonlinear iteration 1: 0.000200925
 
    Copying properties into prescribed temperature field... done.
    Solving temperature system... 0 iterations.
    Solving entropy system ... 0 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
    Solving Stokes system (GMG)... 1000+2 iterations.
-      Relative nonlinear residuals (temperature, compositional fields, Stokes system): 1.72844e-16, 1.68996e-16, 0, 1.65389e-07
-      Relative nonlinear residual (total system) after nonlinear iteration 2: 1.65389e-07
+      Relative nonlinear residuals (temperature, compositional fields, Stokes system): 1.69925e-16, 1.64537e-16, 0, 1.65388e-07
+      Relative nonlinear residual (total system) after nonlinear iteration 2: 1.65388e-07
 
 
    Postprocessing:
      Writing graphical output:           output-entropy_conduction/solution/solution-00000
-     RMS, max velocity:                  7.16e-17 m/year, 8.26e-16 m/year
+     RMS, max velocity:                  7.16e-17 m/year, 1.29e-15 m/year
      Temperature min/avg/max:            1600 K, 1833 K, 2000 K
      Mass fluxes through boundary parts: 0 kg/yr, 0 kg/yr, 0 kg/yr, 0 kg/yr
      Compositions min/max/mass:          2534/2534/4.282e+13 // 3363/4376/6.588e+13
@@ -33,30 +33,34 @@ Number of degrees of freedom: 6,417 (2,406+402+1,203+1,203+1,203)
    Copying properties into prescribed temperature field... done.
    Solving temperature system... 65 iterations.
    Solving entropy system ... 7 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
-   Solving Stokes system (GMG)... 1000+4 iterations.
+   Solving Stokes system (GMG)... 1000+3 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 0.00323779, 0.00076846, 0, 1
       Relative nonlinear residual (total system) after nonlinear iteration 1: 1
 
    Copying properties into prescribed temperature field... done.
    Solving temperature system... 62 iterations.
    Solving entropy system ... 7 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
-   Solving Stokes system (GMG)... 1000+3 iterations.
+   Solving Stokes system (GMG)... 1000+2 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 0.000738786, 0.000318795, 0, 0.229509
       Relative nonlinear residual (total system) after nonlinear iteration 2: 0.229509
 
    Copying properties into prescribed temperature field... done.
    Solving temperature system... 57 iterations.
    Solving entropy system ... 7 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
-   Solving Stokes system (GMG)... 1000+3 iterations.
+   Solving Stokes system (GMG)... 1000+2 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 0.000320524, 0.000204331, 0, 0.188927
       Relative nonlinear residual (total system) after nonlinear iteration 3: 0.188927
 
    Copying properties into prescribed temperature field... done.
    Solving temperature system... 55 iterations.
    Solving entropy system ... 7 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
    Solving Stokes system (GMG)... 1000+2 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 0.000206157, 0.000152752, 0, 0.144734
@@ -65,38 +69,43 @@ Number of degrees of freedom: 6,417 (2,406+402+1,203+1,203+1,203)
    Copying properties into prescribed temperature field... done.
    Solving temperature system... 54 iterations.
    Solving entropy system ... 7 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
-   Solving Stokes system (GMG)... 1000+3 iterations.
+   Solving Stokes system (GMG)... 1000+2 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 0.000154229, 0.000122626, 0, 0.110455
       Relative nonlinear residual (total system) after nonlinear iteration 5: 0.110455
 
    Copying properties into prescribed temperature field... done.
-   Solving temperature system... 53 iterations.
+   Solving temperature system... 52 iterations.
    Solving entropy system ... 6 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
    Solving Stokes system (GMG)... 1000+3 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 0.000124149, 0.00010261, 0, 0.0869101
       Relative nonlinear residual (total system) after nonlinear iteration 6: 0.0869101
 
    Copying properties into prescribed temperature field... done.
-   Solving temperature system... 52 iterations.
+   Solving temperature system... 51 iterations.
    Solving entropy system ... 6 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
-   Solving Stokes system (GMG)... 1000+3 iterations.
+   Solving Stokes system (GMG)... 1000+2 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 0.000104258, 8.82808e-05, 0, 0.0706989
       Relative nonlinear residual (total system) after nonlinear iteration 7: 0.0706989
 
    Copying properties into prescribed temperature field... done.
-   Solving temperature system... 51 iterations.
+   Solving temperature system... 50 iterations.
    Solving entropy system ... 6 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
-   Solving Stokes system (GMG)... 1000+3 iterations.
+   Solving Stokes system (GMG)... 1000+2 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 9.00225e-05, 7.7493e-05, 0, 0.0591696
       Relative nonlinear residual (total system) after nonlinear iteration 8: 0.0591696
 
    Copying properties into prescribed temperature field... done.
-   Solving temperature system... 51 iterations.
+   Solving temperature system... 50 iterations.
    Solving entropy system ... 6 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
    Solving Stokes system (GMG)... 1000+2 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 7.92947e-05, 6.90828e-05, 0, 0.0506624
@@ -105,6 +114,7 @@ Number of degrees of freedom: 6,417 (2,406+402+1,203+1,203+1,203)
    Copying properties into prescribed temperature field... done.
    Solving temperature system... 50 iterations.
    Solving entropy system ... 6 iterations.
+   Copying properties into prescribed temperature field... done.
    Copying properties into prescribed compositional field density_field... done.
    Solving Stokes system (GMG)... 1000+2 iterations.
       Relative nonlinear residuals (temperature, compositional fields, Stokes system): 7.09111e-05, 6.2345e-05, 0, 0.0441691
@@ -116,8 +126,8 @@ Number of degrees of freedom: 6,417 (2,406+402+1,203+1,203+1,203)
    Continuing to the next timestep even though solution is not fully converged.
 
    Postprocessing:
-     RMS, max velocity:                  1.64e-07 m/year, 8.46e-07 m/year
-     Temperature min/avg/max:            1600 K, 1833 K, 1993 K
+     RMS, max velocity:                  1.64e-07 m/year, 8.42e-07 m/year
+     Temperature min/avg/max:            1600 K, 1833 K, 1997 K
      Mass fluxes through boundary parts: 0 kg/yr, 0 kg/yr, 0 kg/yr, 0 kg/yr
      Compositions min/max/mass:          2527/2541/4.282e+13 // 3363/4377/6.588e+13
 

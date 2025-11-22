@@ -36,7 +36,7 @@ Number of mesh deformation degrees of freedom: 1,466
      Rayleigh number:                               0
 
      Topography min/max:       0 m, 0 m
-     RMS, max velocity:        0.000714 m/year, 0.00231 m/year
+     RMS, max velocity:        0.000714 m/year, 0.00232 m/year
      Writing graphical output: output-viz_mesh_deform_vector/solution/solution-00000
 
 *** Timestep 1:  t=675303 years, dt=675303 years
@@ -46,7 +46,7 @@ Number of mesh deformation degrees of freedom: 1,466
 
    Postprocessing:
      Topography min/max:       -393.6 m, 876.5 m
-     RMS, max velocity:        0.000764 m/year, 0.00215 m/year
+     RMS, max velocity:        0.000764 m/year, 0.00219 m/year
      Writing graphical output: output-viz_mesh_deform_vector/solution/solution-00001
 
 *** Timestep 2:  t=1.96513e+06 years, dt=1.28983e+06 years
@@ -56,7 +56,7 @@ Number of mesh deformation degrees of freedom: 1,466
 
    Postprocessing:
      Topography min/max:       -1953 m, 950.1 m
-     RMS, max velocity:        0.00121 m/year, 0.00298 m/year
+     RMS, max velocity:        0.00121 m/year, 0.00299 m/year
      Writing graphical output: output-viz_mesh_deform_vector/solution/solution-00002
 
 *** Timestep 3:  t=2.514e+06 years, dt=548867 years
@@ -76,7 +76,7 @@ Number of mesh deformation degrees of freedom: 1,466
 
    Postprocessing:
      Topography min/max:       -300.5 m, 645.6 m
-     RMS, max velocity:        0.000535 m/year, 0.00135 m/year
+     RMS, max velocity:        0.000535 m/year, 0.00138 m/year
      Writing graphical output: output-viz_mesh_deform_vector/solution/solution-00004
 
 *** Timestep 5:  t=4.80073e+06 years, dt=1.50091e+06 years
@@ -109,7 +109,7 @@ Number of mesh deformation degrees of freedom: 1,466
 
    Postprocessing:
      Topography min/max:       -83.67 m, 212 m
-     RMS, max velocity:        0.000347 m/year, 0.001 m/year
+     RMS, max velocity:        0.000347 m/year, 0.00101 m/year
      Writing graphical output: output-viz_mesh_deform_vector/solution/solution-00007
 
 *** Timestep 8:  t=8.37191e+06 years, dt=1.58468e+06 years
@@ -135,11 +135,11 @@ Number of mesh deformation degrees of freedom: 1,466
 *** Timestep 10:  t=1.15953e+07 years, dt=1.83287e+06 years
    Solving mesh displacement system... 5 iterations.
    Solving temperature system... 20 iterations.
-   Solving Stokes system (GMG)... 0+52 iterations.
+   Solving Stokes system (GMG)... 0+53 iterations.
 
    Postprocessing:
      Topography min/max:       -185.6 m, 89.51 m
-     RMS, max velocity:        0.000359 m/year, 0.000975 m/year
+     RMS, max velocity:        0.000359 m/year, 0.000976 m/year
      Writing graphical output: output-viz_mesh_deform_vector/solution/solution-00010
 
 

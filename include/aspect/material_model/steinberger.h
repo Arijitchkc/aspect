@@ -24,6 +24,8 @@
 #include <aspect/material_model/interface.h>
 #include <aspect/material_model/equation_of_state/thermodynamic_table_lookup.h>
 #include <aspect/material_model/thermal_conductivity/interface.h>
+#include <aspect/material_model/rheology/drucker_prager.h>
+#include <aspect/material_model/utilities.h>
 
 #include <aspect/simulator_access.h>
 #include <deal.II/fe/component_mask.h>
@@ -141,19 +143,6 @@ namespace aspect
         void update() override;
 
         /**
-         * @name Physical parameters used in the basic equations
-         * @{
-         */
-        virtual double viscosity (const double                  temperature,
-                                  const double                  pressure,
-                                  const std::vector<double>    &compositional_fields,
-                                  const SymmetricTensor<2,dim> &strain_rate,
-                                  const Point<dim>             &position) const;
-        /**
-         * @}
-         */
-
-        /**
          * @name Qualitative properties one can ask a material model
          * @{
          */
@@ -204,6 +193,18 @@ namespace aspect
 
 
       private:
+        /**
+         * Given the material model inputs @p in, and the volume fractions
+         * @p volume_fractions of all chemical fields, compute the viscosity for
+         * the evaluation point @p q, and fill the additional material model outputs
+         * in @p out that have to do with the viscosity (the plastic additional
+         * outputs) for evaluation point @p q.
+         */
+        double viscosity (const unsigned int q,
+                          const std::vector<double> &volume_fractions,
+                          const MaterialModel::MaterialModelInputs<dim> &in,
+                          MaterialModel::MaterialModelOutputs<dim> &out) const;
+
         /**
          * Whether the compositional fields representing mass fractions
          * should be normalized to one when computing their fractions
@@ -294,6 +295,14 @@ namespace aspect
                                       const std::vector<double> &volume_fractions,
                                       const MaterialModel::MaterialModelInputs<dim> &in,
                                       MaterialModel::MaterialModelOutputs<dim> &out) const;
+
+        /**
+         * Drucker-Prager rheology related
+         * Objects for computing plastic stresses, viscosities, and additional outputs
+         */
+        Rheology::DruckerPrager<dim> drucker_prager_plasticity;
+        bool enable_drucker_prager_rheology;
+        Rheology::DruckerPragerParameters drucker_prager_parameters;
 
     };
   }

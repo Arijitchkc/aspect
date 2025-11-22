@@ -446,8 +446,12 @@ namespace aspect
                  << std::endl;
         }
 
+      Utilities::create_directory (this->get_output_directory() + "dynamic_topography/",
+                                   this->get_mpi_communicator(),
+                                   /* silent=*/true);
+
       std::string filename = this->get_output_directory() +
-                             "dynamic_topography_" + boundary_name + "." +
+                             "dynamic_topography/dynamic_topography_" + boundary_name + "." +
                              Utilities::int_to_string(this->get_timestep_number(), 5);
       if (this->get_parameters().run_postprocessors_on_nonlinear_iterations)
         filename.append("." + Utilities::int_to_string (this->get_nonlinear_iteration(), 4));
@@ -476,7 +480,7 @@ namespace aspect
                              "is part of the material model, this parameter `Density above' allows the user to specify the density "
                              "value of material that is displaced above the solid surface. By default this material is assumed to "
                              "be air, with a density of 0. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
           prm.declare_entry ("Density below","9900.",
                              Patterns::Double (0.),
                              "Dynamic topography is calculated as the excess or lack of mass that is supported by mantle flow. "
@@ -485,7 +489,7 @@ namespace aspect
                              "is part of the material model, this parameter `Density below' allows the user to specify the density "
                              "value of material that is displaced below the solid surface. By default this material is assumed to "
                              "be outer core material with a density of 9900. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
           prm.declare_entry ("Output surface", "true",
                              Patterns::Bool(),
                              "Whether to output a file containing the surface dynamic topography.");

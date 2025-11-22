@@ -145,16 +145,92 @@ you would like to contribute some code.
 
 ### Installing astyle
 
-To correctly indent the code in ASPECT you can use `make indent` or `ninja indent`
-depending on the build system you are using. The indenting script needs version 2.04 astyle.
-If you installed deal.II through candi, the correct astyle may already on your system and in your path.
-If the indenting script complains that it could not find (the correct version of) astyle,
-you can find it [here](https://sourceforge.net/projects/astyle/files/astyle/astyle%202.04/).
+If you installed deal.II through candi with `./candi.sh --packages="<other packages> astyle"`,
+the correct astyle may already on your system. First, add astyle to your path by sourcing the
+deal.II environment script with:
 
-An easy way to install it is through using the following command in Linux (do not do this in the aspect directory):
-`mkdir astyle && cd astyle && wget 'https://sourceforge.net/projects/astyle/files/astyle/astyle 2.04/astyle_2.04_linux.tar.gz' && tar -zxvf astyle_2.04_linux.tar.gz && cd astyle/build/gcc && make && sudo make install`.
-This will create a new directory called astyle, download, unpack, compile and install it.
-When you add the bin directory to to your path, the indent command should find astyle.
+```{code-block} bash
+source $HOME/dealii-candi/configuration/enable.sh
+```
+
+This will make astyle available to ASPECT's indentation script. Then confirm that astyle is available
+and correctly versioned with:
+
+```{code-block} bash
+which astyle
+astyle --version
+```
+
+If `which astyle` returns `astyle not found` or if `astyle --version` does not show
+`Artistic Style Version 2.04` you will need to use one of the methods below to install
+the correct version manually.
+
+#### With candi (Linux/macOS/Windows and HPC clusters)
+
+If you installed deal.II with candi but didn't include astyle in the list of packages, you
+can still install it with:
+
+```{code-block} bash
+git clone https://github.com/dealii/candi.git
+cd candi
+./candi.sh --packages="astyle"
+source $HOME/dealii-candi/configuration/enable.sh
+```
+
+:::{important}
+Installing astyle via candi is the preferred method for HPC Linux clusters. The astyle
+installation methods below require sudo privileges, which will not work for typical HPC
+cluster users!
+:::
+
+#### From source (Linux/macOS)
+
+Linux users can install astyle from source with:
+
+```{code-block} bash
+# Do this outside of the ASPECT directory
+mkdir astyle && cd astyle
+wget 'https://sourceforge.net/projects/astyle/files/astyle/astyle%202.04/astyle_2.04_linux.tar.gz'
+tar -xvzf astyle_2.04_linux.tar.gz
+cd astyle/build/gcc
+make
+sudo make prefix=/usr/local install
+```
+
+macOS users can install astyle from source with:
+
+```{code-block} bash
+# Do this outside of the ASPECT directory
+mkdir astyle && cd astyle
+curl -LO 'https://sourceforge.net/projects/astyle/files/astyle/astyle%202.04/astyle_2.04_linux.tar.gz'
+tar -xvzf astyle_2.04_linux.tar.gz
+cd astyle/build/gcc
+make
+sudo make INSTALL=install prefix=/usr/local install
+```
+
+This installs astyle to `/usr/local/bin`, which will make astyle available to ASPECT's indentation script.
+
+#### Example astyle usage
+
+To correctly indent the code in the ASPECT source directory, use `make indent` or `ninja indent`
+while in the ASPECT build directory (depending on your build system):
+
+```{code-block} bash
+cd <path to your aspect build dir>
+make indent
+```
+
+If you wish to correctly indent individual files in another directory, you can use:
+
+```{code-block} bash
+cp <path to your aspect source dir>/contrib/utilities/astyle.rc .
+astyle --options=astyle.rc my_plugin.cc my_plugin.h
+```
+
+:::{important}
+You NEED to use astyle version 2.04 for correct results (older versions or 2.05 will not work)!
+:::
 
 ### Changelog entries
 
@@ -192,17 +268,20 @@ ways in which your contribution will be acknowledged by the ASPECT community:
 - If you contributed a significant part of the manual (such as a new cookbook,
   benchmark, or subsection), you will be listed as one of the contributing
   authors of the manual.
-- The Principal Developers of ASPECT come together on a regular basis and discuss
-  whether others should be invited to join the
-  group of *Principal Developers*. Criteria
-  for this decision include:
-
-  - A profound understanding of ASPECT's structure and vision;
-  - A proven willingness to further the project's goals and help other users;
-  - Significant contributions to ASPECT (not necessarily only source code,
-    also forum advice, documentation, benchmarks, tutorials);
-  - Regular and active contributions to ASPECT for more than one year,
-    not restricted to user meetings.
+- The Principal Developers of ASPECT meet regularly to discuss the direction
+  of the project and to consider inviting new members to join the group of
+  Principal Developers.
+  New members are typically invited based on the following criteria:
+  - A deep understanding of ASPECT's structure, design, and long-term vision;
+  - A demonstrated commitment to advancing the project's goals and supporting
+    the ASPECT community;
+  - Meaningful contributions to ASPECT. These contributions may of course be
+    to the source code, but can also include documentation, tutorials,
+    benchmarks, or active engagement on the forum;
+  - Consistent and active involvement in the project for over a year,
+    beyond participation in user meetings;
+  - A collaborative mindset and a constructive, solution-oriented approach
+    to discussions.
 
   The group of current Principal Developers is listed in the
   [AUTHORS.md](https://github.com/geodynamics/aspect/blob/main/AUTHORS.md)

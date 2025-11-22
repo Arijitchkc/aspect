@@ -45,7 +45,7 @@ namespace aspect
        */
       enum class DeformationType
       {
-        passive, olivine_a_fabric, olivine_b_fabric, olivine_c_fabric, olivine_d_fabric, olivine_e_fabric, enstatite
+        passive, olivine_a_fabric, olivine_b_fabric, olivine_c_fabric, olivine_d_fabric, olivine_e_fabric, enstatite, clinopyroxene, olivine_d_0kl
       };
 
 
@@ -64,7 +64,7 @@ namespace aspect
        */
       enum class DeformationTypeSelector
       {
-        passive, olivine_a_fabric, olivine_b_fabric, olivine_c_fabric, olivine_d_fabric, olivine_e_fabric, enstatite, olivine_karato_2008
+        passive, olivine_a_fabric, olivine_b_fabric, olivine_c_fabric, olivine_d_fabric, olivine_e_fabric, enstatite, olivine_karato_2008, clinopyroxene, olivine_d_0kl
       };
 
       /**
@@ -201,7 +201,8 @@ namespace aspect
            * @param mineral_i The mineral for which to compute the derivatives for.
            * @param strain_rate_3d The 3D strain rate at the location where the derivative is requested.
            * @param velocity_gradient_tensor The velocity gradient tensor at the location where the derivative is requested.
-           * @param position the location for which the derivative is requested.
+           * @param position The location for which the derivative is requested.
+           * @param cell The cell that contains the point @p position.
            * @param temperature The temperature at the location where the derivative is requested.
            * @param pressure The pressure at the location where the derivative is requested.
            * @param velocity The veloicty at the location where the derivative is requested.
@@ -217,6 +218,7 @@ namespace aspect
                               const SymmetricTensor<2,3> &strain_rate_3d,
                               const Tensor<2,3> &velocity_gradient_tensor,
                               const Point<dim> &position,
+                              const typename DoFHandler<dim>::active_cell_iterator &cell,
                               const double temperature,
                               const double pressure,
                               const Tensor<1,dim> &velocity,
@@ -237,11 +239,13 @@ namespace aspect
            * The planes are ordered from weakest to strongest with relative values,
            * where the inactive plane is infinity strong. So it is a measure of strength
            * on each slip plane.
+           * @param deformation_type Represent one of the deformation types
            * @param prevent_nondimensionalization Prevent nondimensializing values internally.
            * Only for unit testing purposes.
            */
           std::pair<std::vector<double>, std::vector<Tensor<2,3>>>
-          compute_derivatives_drex_2004(const unsigned int cpo_index,
+          compute_derivatives_drex_2004(const DeformationType deformation_type,
+                                        const unsigned int cpo_index,
                                         const ArrayView<double> &data,
                                         const unsigned int mineral_i,
                                         const SymmetricTensor<2,3> &strain_rate_3d,
@@ -287,6 +291,7 @@ namespace aspect
           DeformationType
           determine_deformation_type(const DeformationTypeSelector deformation_type_selector,
                                      const Point<dim> &position,
+                                     const typename DoFHandler<dim>::active_cell_iterator &cell,
                                      const double temperature,
                                      const double pressure,
                                      const Tensor<1,dim> &velocity,
@@ -612,6 +617,30 @@ namespace aspect
            * Sets which type of initial grain model is used to create the gain sizes and orientations
            */
           CPOInitialGrainsModel initial_grains_model;
+
+          /**
+           * Clinopyroxene Reference Resolved Shear Stress (RRSS);
+           * The RRSS notation is defined in
+           * Kaminski etal., 2004 and see Fraters and Billen 2021 for details;
+           * Activated when 'Clinopyroxene' is set as a Mineral type in the input file.
+           *
+           * RRSS value for CPX does not exist in DRex formulation,
+           * but Bascou etal., 2002 JSG using VPSC provides a reference, which is
+           * supported by experimental work from Zhang et al., 2006 EPSL
+           * that agree with the three main slip systems
+          */
+          std::vector<double> CPX_RRSS;
+
+          /**
+           * Alternative Reference Resolved Shear Stress (RRSS) for;
+           * Olivine D type fabric slip systems with {0kl} slip plane;
+           * Activated when 'Olivine: D-fabric_0kl' is set as a Mineral type in the input file
+           *
+           * The RRSS notation is defined in Kaminski etal., 2004 and
+           * see Fraters and Billen 2021 for details;
+           * Main slip systems from Karato 2008 and Bystricky et al., 2001
+          */
+          std::vector<double> OlivineD_RRSS;
 
           /** @} */
 

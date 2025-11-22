@@ -36,6 +36,7 @@
 #include <aspect/coordinate_systems.h>
 #include <aspect/structured_data.h>
 
+#include <mpi.h>
 
 
 namespace aspect
@@ -690,7 +691,8 @@ namespace aspect
      * @param comm MPI communicator, used to limit creation of directory to
      * processor 0.
      * @param silent Print a nicely formatted message on processor 0 if set
-     * to true.
+     * to false and the directory does not exist yet and is therefore created
+     * in this function.
      */
     void create_directory(const std::string &pathname,
                           const MPI_Comm comm,
@@ -1102,9 +1104,12 @@ namespace aspect
      * that matches the dealii::Function interface with a number of output
      * components equal to the number of components of the finite element
      * in use.
+     *
+     * This function is a special case of the VectorFunctionFromTensorFunctionObject
+     * class.
      */
     template <int dim>
-    class VectorFunctionFromVelocityFunctionObject : public Function<dim>
+    class VectorFunctionFromVelocityFunctionObject : public VectorFunctionFromTensorFunctionObject<dim>
     {
       public:
         /**
@@ -1113,40 +1118,11 @@ namespace aspect
          * interface.
          *
          * @param n_components total number of components of the finite element system.
-         * @param function_object The function that will form one component
+         * @param function_object The function that will form the first `dim` components
          *     of the resulting Function object.
          */
         VectorFunctionFromVelocityFunctionObject (const unsigned int n_components,
                                                   const std::function<Tensor<1,dim> (const Point<dim> &)> &function_object);
-
-        /**
-         * Return the value of the
-         * function at the given
-         * point. Returns the value the
-         * function given to the constructor
-         * produces for this point.
-         */
-        double value (const Point<dim>   &p,
-                      const unsigned int  component = 0) const override;
-
-        /**
-         * Return all components of a
-         * vector-valued function at a
-         * given point.
-         *
-         * <tt>values</tt> shall have the right
-         * size beforehand,
-         * i.e. #n_components.
-         */
-        void vector_value (const Point<dim>   &p,
-                           Vector<double>     &values) const override;
-
-      private:
-        /**
-         * The function object which we call when this class's value() or
-         * value_list() functions are called.
-         */
-        const std::function<Tensor<1,dim> (const Point<dim> &)> function_object;
     };
 
     /**
@@ -1212,13 +1188,10 @@ namespace aspect
                                                     const double phi2);
 
   }
-}
 
 
 // inline implementations:
 #ifndef DOXYGEN
-namespace aspect
-{
   namespace Utilities
   {
 
@@ -1409,7 +1382,7 @@ namespace aspect
     }
 
   }
-}
 #endif
+}
 
 #endif

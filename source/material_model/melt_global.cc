@@ -77,7 +77,8 @@ namespace aspect
     void
     MeltGlobal<dim>::
     melt_fractions (const MaterialModel::MaterialModelInputs<dim> &in,
-                    std::vector<double> &melt_fractions) const
+                    std::vector<double> &melt_fractions,
+                    const MaterialModel::MaterialModelOutputs<dim> *) const
     {
       double depletion = 0.0;
 
@@ -103,7 +104,8 @@ namespace aspect
     {
       std::vector<double> old_porosity(in.n_evaluation_points());
 
-      ReactionRateOutputs<dim> *reaction_rate_out = out.template get_additional_output<ReactionRateOutputs<dim>>();
+      const std::shared_ptr<ReactionRateOutputs<dim>> reaction_rate_out
+        = out.template get_additional_output_object<ReactionRateOutputs<dim>>();
 
       // we want to get the porosity field from the old solution here,
       // because we need a field that is not updated in the nonlinear iterations
@@ -253,9 +255,11 @@ namespace aspect
         }
 
       // fill melt outputs if they exist
-      MeltOutputs<dim> *melt_out = out.template get_additional_output<MeltOutputs<dim>>();
+      const std::shared_ptr<MeltOutputs<dim>> melt_out
+        = out.template get_additional_output_object<MeltOutputs<dim>>();
 
-      if (melt_out != nullptr)
+      if (melt_out != nullptr && in.requests_property(MaterialProperties::additional_outputs) &&
+          this->introspection().compositional_name_exists("porosity"))
         {
           const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
 
@@ -308,28 +312,28 @@ namespace aspect
           prm.declare_entry ("Reference solid density", "3000.",
                              Patterns::Double (0.),
                              "Reference density of the solid $\\rho_{s,0}$. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
           prm.declare_entry ("Reference melt density", "2500.",
                              Patterns::Double (0.),
                              "Reference density of the melt/fluid$\\rho_{f,0}$. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
           prm.declare_entry ("Reference temperature", "293.",
                              Patterns::Double (0.),
                              "The reference temperature $T_0$. The reference temperature is used "
-                             "in both the density and viscosity formulas. Units: \\si{\\kelvin}.");
+                             "in both the density and viscosity formulas. Units: $\\text{K}$.");
           prm.declare_entry ("Reference shear viscosity", "5e20",
                              Patterns::Double (0.),
                              "The value of the constant viscosity $\\eta_0$ of the solid matrix. "
                              "This viscosity may be modified by both temperature and porosity "
-                             "dependencies. Units: \\si{\\pascal\\second}.");
+                             "dependencies. Units: $\\text{Pa}\\text{s}$.");
           prm.declare_entry ("Reference bulk viscosity", "1e22",
                              Patterns::Double (0.),
                              "The value of the constant bulk viscosity $\\xi_0$ of the solid matrix. "
                              "This viscosity may be modified by both temperature and porosity "
-                             "dependencies. Units: \\si{\\pascal\\second}.");
+                             "dependencies. Units: $\\text{Pa}\\text{s}$.");
           prm.declare_entry ("Reference melt viscosity", "10.",
                              Patterns::Double (0.),
-                             "The value of the constant melt viscosity $\\eta_f$. Units: \\si{\\pascal\\second}.");
+                             "The value of the constant melt viscosity $\\eta_f$. Units: $\\text{Pa}\\text{s}$.");
           prm.declare_entry ("Exponential melt weakening factor", "27.",
                              Patterns::Double (0.),
                              "The porosity dependence of the viscosity. Units: dimensionless.");
@@ -348,15 +352,15 @@ namespace aspect
           prm.declare_entry ("Thermal conductivity", "4.7",
                              Patterns::Double (0.),
                              "The value of the thermal conductivity $k$. "
-                             "Units: \\si{\\watt\\per\\meter\\per\\kelvin}.");
+                             "Units: $\\frac{\\text{W}{\\text{m}\\text{K}}$.");
           prm.declare_entry ("Reference specific heat", "1250.",
                              Patterns::Double (0.),
                              "The value of the specific heat $C_p$. "
-                             "Units: \\si{\\joule\\per\\kelvin\\per\\kilogram}.");
+                             "Units: $\\frac{\\text{J}}{\\text{K}\\text{kg}}$.");
           prm.declare_entry ("Thermal expansion coefficient", "2e-5",
                              Patterns::Double (0.),
                              "The value of the thermal expansion coefficient $\\beta$. "
-                             "Units: \\si{\\per\\kelvin}.");
+                             "Units: $\\frac{1}{\\text{K}}$.");
           prm.declare_entry ("Reference permeability", "1e-8",
                              Patterns::Double(),
                              "Reference permeability of the solid host rock."
@@ -368,11 +372,11 @@ namespace aspect
                              "depleted material. Depletion is indicated by the compositional "
                              "field with the name peridotite. Not used if this field does not "
                              "exist in the model. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
           prm.declare_entry ("Surface solidus", "1300.",
                              Patterns::Double (0.),
                              "Solidus for a pressure of zero. "
-                             "Units: \\si{\\kelvin}.");
+                             "Units: $\\text{K}$.");
           prm.declare_entry ("Depletion solidus change", "200.0",
                              Patterns::Double (),
                              "The solidus temperature change for a depletion of 100\\%. For positive "
@@ -380,20 +384,20 @@ namespace aspect
                              "(depletion) and lowered for a negative peridotite field (enrichment). "
                              "Scaling with depletion is linear. Only active when fractional melting "
                              "is used. "
-                             "Units: \\si{\\kelvin}.");
+                             "Units: $\\text{K}$.");
           prm.declare_entry ("Pressure solidus change", "6e-8",
                              Patterns::Double (),
                              "The linear solidus temperature change with pressure. For positive "
                              "values, the solidus gets increased for positive pressures. "
-                             "Units: \\si{\\per\\pascal}.");
+                             "Units: $\\frac{1}{\\text{Pa}}$.");
           prm.declare_entry ("Solid compressibility", "0.0",
                              Patterns::Double (0.),
                              "The value of the compressibility of the solid matrix. "
-                             "Units: \\si{\\per\\pascal}.");
+                             "Units: $\\frac{1}{\\text{Pa}}$.");
           prm.declare_entry ("Melt compressibility", "0.0",
                              Patterns::Double (0.),
                              "The value of the compressibility of the melt. "
-                             "Units: \\si{\\per\\pascal}.");
+                             "Units: $\\frac{1}{\\text{Pa}}$.");
           prm.declare_entry ("Melt bulk modulus derivative", "0.0",
                              Patterns::Double (0.),
                              "The value of the pressure derivative of the melt bulk "
@@ -420,8 +424,7 @@ namespace aspect
                              "Also note that the melting time scale has to be larger than or equal to the reaction "
                              "time step used in the operator splitting scheme, otherwise reactions can not be "
                              "computed. If the model does not use operator splitting, this parameter is not used. "
-                             "Units: yr or s, depending on the ``Use years "
-                             "in output instead of seconds'' parameter.");
+                             "Units: yr or s, depending on the ``Use years instead of seconds'' parameter.");
           prm.declare_entry ("Exponential depletion strengthening factor", "0.0",
                              Patterns::Double (0.),
                              "$\\alpha_F$: exponential dependency of viscosity on the depletion "
@@ -527,7 +530,7 @@ namespace aspect
     MeltGlobal<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
     {
       if (this->get_parameters().use_operator_splitting
-          && out.template get_additional_output<ReactionRateOutputs<dim>>() == nullptr)
+          && out.template has_additional_output_object<ReactionRateOutputs<dim>>() == false)
         {
           const unsigned int n_points = out.n_evaluation_points();
           out.additional_outputs.push_back(

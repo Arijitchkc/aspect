@@ -205,14 +205,14 @@ namespace aspect
           // analytical solution for the thermal boundary layer from half-space cooling model
           surface_cooling_temperature = age_top > 0.0 ?
                                         (T_surface - adiabatic_surface_temperature) *
-                                        erfc(this->get_geometry_model().depth(position) /
-                                             (2 * std::sqrt(kappa * age_top)))
+                                        std::erfc(this->get_geometry_model().depth(position) /
+                                                  (2 * std::sqrt(kappa * age_top)))
                                         : 0.0;
           bottom_heating_temperature = (age_bottom > 0.0 && this->get_adiabatic_conditions().is_initialized()) ?
                                        (T_bottom - adiabatic_bottom_temperature + subadiabaticity)
-                                       * erfc((this->get_geometry_model().maximal_depth()
-                                               - this->get_geometry_model().depth(position)) /
-                                              (2 * std::sqrt(kappa * age_bottom)))
+                                       * std::erfc((this->get_geometry_model().maximal_depth()
+                                                    - this->get_geometry_model().depth(position)) /
+                                                   (2 * std::sqrt(kappa * age_bottom)))
                                        : 0.0;
         }
 
@@ -376,13 +376,13 @@ namespace aspect
                              Patterns::Double (0.),
                              "The age of the upper thermal boundary layer, used for the calculation "
                              "of the half-space cooling model temperature. Units: years if the "
-                             "'Use years in output instead of seconds' parameter is set; "
+                             "'Use years instead of seconds' parameter is set; "
                              "seconds otherwise.");
           prm.declare_entry ("Age bottom boundary layer", "0.",
                              Patterns::Double (0.),
                              "The age of the lower thermal boundary layer, used for the calculation "
                              "of the half-space cooling model temperature. Units: years if the "
-                             "'Use years in output instead of seconds' parameter is set; "
+                             "'Use years instead of seconds' parameter is set; "
                              "seconds otherwise.");
           prm.declare_entry ("Radius", "0.",
                              Patterns::Double (0.),
@@ -408,7 +408,7 @@ namespace aspect
                              "If this value is larger than 0, the initial temperature profile will "
                              "not be adiabatic, but subadiabatic. This value gives the maximal "
                              "deviation from adiabaticity. Set to 0 for an adiabatic temperature "
-                             "profile. Units: \\si{\\kelvin}.\n\n"
+                             "profile. Units: $\\text{K}$.\n\n"
                              "The function object in the Function subsection "
                              "represents the compositional fields that will be used as a reference "
                              "profile for calculating the thermal diffusivity. "

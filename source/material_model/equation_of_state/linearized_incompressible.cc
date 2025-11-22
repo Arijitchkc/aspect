@@ -33,28 +33,28 @@ namespace aspect
       LinearizedIncompressible<dim>::
       evaluate(const MaterialModel::MaterialModelInputs<dim> &in,
                const unsigned int q,
-               MaterialModel::EquationOfStateOutputs<dim> &out) const
+               MaterialModel::EquationOfStateOutputs<dim> &eos_outputs) const
       {
 
-        Assert(maximum_number_of_compositions+1 >= out.densities.size(),
+        Assert(maximum_number_of_compositions+1 >= eos_outputs.densities.size(),
                ExcMessage("Error: You are trying to evaluate the equation of state with "
-                          + Utilities::to_string(out.densities.size()-1) +
+                          + Utilities::to_string(eos_outputs.densities.size()-1) +
                           " compositional fields, which is larger than "
                           + Utilities::to_string(maximum_number_of_compositions) +
                           ", the number of fields the equation of state was set up with."));
 
 
-        for (unsigned int c=0; c < out.densities.size(); ++c)
+        for (unsigned int c=0; c < eos_outputs.densities.size(); ++c)
           {
-            out.densities[c] = reference_rho * (1 - thermal_alpha * (in.temperature[q] - reference_T));
+            eos_outputs.densities[c] = reference_rho * (1 - thermal_alpha * (in.temperature[q] - reference_T));
             if (c>0)
-              out.densities[c] += compositional_delta_rhos[c-1];
+              eos_outputs.densities[c] += compositional_delta_rhos[c-1];
 
-            out.thermal_expansion_coefficients[c] = thermal_alpha;
-            out.specific_heat_capacities[c] = reference_specific_heat;
-            out.compressibilities[c] = 0.0;
-            out.entropy_derivative_pressure[c] = 0.0;
-            out.entropy_derivative_temperature[c] = 0.0;
+            eos_outputs.thermal_expansion_coefficients[c] = thermal_alpha;
+            eos_outputs.specific_heat_capacities[c] = reference_specific_heat;
+            eos_outputs.compressibilities[c] = 0.0;
+            eos_outputs.entropy_derivative_pressure[c] = 0.0;
+            eos_outputs.entropy_derivative_temperature[c] = 0.0;
           }
       }
 
@@ -78,19 +78,19 @@ namespace aspect
         prm.declare_entry ("Reference density", "3300.",
                            Patterns::Double (0.),
                            "Reference density $\\rho_0$. "
-                           "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                           "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
         prm.declare_entry ("Reference temperature", "293.",
                            Patterns::Double (0.),
                            "The reference temperature $T_0$. The reference temperature is used "
-                           "in both the density and viscosity formulas. Units: \\si{\\kelvin}.");
+                           "in both the density and viscosity formulas. Units: $\\text{K}$.");
         prm.declare_entry ("Reference specific heat", "1250.",
                            Patterns::Double (0.),
                            "The value of the specific heat $C_p$. "
-                           "Units: \\si{\\joule\\per\\kelvin\\per\\kilogram}.");
+                           "Units: $\\frac{\\text{J}}{\\text{K}\\text{kg}}$.");
         prm.declare_entry ("Thermal expansion coefficient", "2e-5",
                            Patterns::Double (0.),
                            "The value of the thermal expansion coefficient $\\alpha$. "
-                           "Units: \\si{\\per\\kelvin}.");
+                           "Units: $\\frac{1}{\\text{K}}$.");
         if (n_compositions > 0)
           prm.declare_entry ("Density differential for compositional field 1", "0.",
                              Patterns::Double(),
@@ -102,7 +102,7 @@ namespace aspect
                              "fields, then the material model determines how many of them influence the density. "
                              "The composition-dependence adds a term of the kind $+\\Delta \\rho \\; c_1(\\mathbf x)$. "
                              "This parameter describes the value of $\\Delta \\rho$. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}/unit change in composition.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$/unit change in composition.");
         if (n_compositions > 1)
           prm.declare_entry ("Density differential for compositional field 2", "0.",
                              Patterns::Double(),
@@ -114,7 +114,7 @@ namespace aspect
                              "fields, then the material model determines how many of them influence the density. "
                              "The composition-dependence adds a term of the kind $+\\Delta \\rho \\; c_2(\\mathbf x)$. "
                              "This parameter describes the value of $\\Delta \\rho$. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}/unit change in composition.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$/unit change in composition.");
       }
 
 

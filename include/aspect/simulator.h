@@ -53,9 +53,11 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 #include <aspect/gravity_model/interface.h>
 #include <aspect/boundary_temperature/interface.h>
 #include <aspect/boundary_heat_flux/interface.h>
+#include <aspect/boundary_convective_heating/interface.h>
 #include <aspect/boundary_composition/interface.h>
 #include <aspect/initial_temperature/interface.h>
 #include <aspect/initial_composition/interface.h>
+#include <aspect/prescribed_solution/interface.h>
 #include <aspect/prescribed_stokes_solution/interface.h>
 #include <aspect/boundary_velocity/interface.h>
 #include <aspect/boundary_fluid_pressure/interface.h>
@@ -65,12 +67,18 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 #include <aspect/postprocess/interface.h>
 #include <aspect/adiabatic_conditions/interface.h>
 #include <aspect/particle/manager.h>
+#include <aspect/advection_field.h>
 
 #include <boost/iostreams/tee.hpp>
 #include <boost/iostreams/stream.hpp>
 
 #include <memory>
 #include <thread>
+
+namespace WorldBuilder
+{
+  class World;
+}
 
 
 namespace aspect
@@ -91,7 +99,7 @@ namespace aspect
   }
 
   template <int dim, int velocity_degree>
-  class StokesMatrixFreeHandlerImplementation;
+  class StokesMatrixFreeHandlerLocalSmoothingImplementation;
 
   namespace MeshDeformation
   {
@@ -225,7 +233,7 @@ namespace aspect
        * <code>source/simulator/parameters.cc</code>.
        */
       static
-      void declare_parameters (ParameterHandler &prm);
+      void declare_parameters (ParameterHandler &prm, const unsigned int mpi_rank);
 
       /**
        * The function that runs the overall algorithm. It contains the loop
@@ -261,145 +269,7 @@ namespace aspect
        */
       using NullspaceRemoval = typename Parameters<dim>::NullspaceRemoval;
 
-
-      /**
-       * A structure that is used as an argument to functions that can work on
-       * both the temperature and the compositional variables and that need to
-       * be told which one of the two, as well as on which of the
-       * compositional variables.
-       */
-      struct AdvectionField
-      {
-        /**
-         * An enum indicating whether the identified variable is the
-         * temperature or one of the compositional fields.
-         */
-        enum FieldType { temperature_field, compositional_field };
-
-        /**
-         * A variable indicating whether the identified variable is the
-         * temperature or one of the compositional fields.
-         */
-        const FieldType    field_type;
-
-        /**
-         * A variable identifying which of the compositional fields is
-         * selected. This variable is meaningless if the temperature is
-         * selected.
-         */
-        const unsigned int compositional_variable;
-
-        /**
-         * Constructor.
-         * @param field_type Determines whether this variable should select
-         * the temperature field or a compositional field.
-         * @param compositional_variable The number of the compositional field
-         * if the first argument in fact chooses a compositional variable.
-         * Meaningless if the first argument equals temperature.
-         *
-         * This function is implemented in
-         * <code>source/simulator/helper_functions.cc</code>.
-         */
-        AdvectionField (const FieldType field_type,
-                        const unsigned int compositional_variable = numbers::invalid_unsigned_int);
-
-        /**
-         * A static function that creates an object identifying the
-         * temperature.
-         *
-         * This function is implemented in
-         * <code>source/simulator/helper_functions.cc</code>.
-         */
-        static
-        AdvectionField temperature ();
-
-        /**
-         * A static function that creates an object identifying given
-         * compositional field.
-         *
-         * This function is implemented in
-         * <code>source/simulator/helper_functions.cc</code>.
-         */
-        static
-        AdvectionField composition (const unsigned int compositional_variable);
-
-        /**
-         * Return whether this object refers to the temperature field.
-         */
-        bool
-        is_temperature () const;
-
-        /**
-         * Return whether this object refers to a field discretized by
-         * discontinuous finite elements.
-         */
-        bool
-        is_discontinuous (const Introspection<dim> &introspection) const;
-
-        /**
-         * Return the method that is used to solve the advection of this field
-         * (i.e. 'fem_field', 'particles').
-         */
-        typename Parameters<dim>::AdvectionFieldMethod::Kind
-        advection_method (const Introspection<dim> &introspection) const;
-
-        /**
-         * Look up the component index for this temperature or compositional
-         * field. See Introspection::component_indices for more information.
-         */
-        unsigned int component_index(const Introspection<dim> &introspection) const;
-
-        /**
-         * Look up the block index for this temperature or compositional
-         * field. See Introspection::block_indices for more information.
-         */
-        unsigned int block_index(const Introspection<dim> &introspection) const;
-
-        /**
-         * Look up the block index where the sparsity pattern for this field
-         * is stored. This can be different than block_index() as several fields
-         * can use the same pattern (typically in the first compositional field
-         * if all fields are compatible). See Introspection::block_indices
-         * for more information.
-         */
-        unsigned int sparsity_pattern_block_index(const Introspection<dim> &introspection) const;
-
-        /**
-         * Returns an index that runs from 0 (temperature field) to n (nth
-         * compositional field), and uniquely identifies the current advection
-         * field among the list of all advection fields. Can be used to index
-         * vectors that contain entries for all advection fields.
-         */
-        unsigned int field_index() const;
-
-        /**
-         * Look up the base element within the larger composite finite element
-         * we used for everything, for this temperature or compositional field
-         * See Introspection::base_elements for more information.
-         */
-        unsigned int base_element(const Introspection<dim> &introspection) const;
-
-        /**
-         * Return the FEValues scalar extractor for this temperature
-         * or compositional field.
-         * This function is implemented in
-         * <code>source/simulator/helper_functions.cc</code>.
-         */
-        FEValuesExtractors::Scalar scalar_extractor(const Introspection<dim> &introspection) const;
-
-        /**
-         * Look up the polynomial degree order for this temperature or compositional
-         * field. See Introspection::polynomial_degree for more information.
-         */
-        unsigned int polynomial_degree(const Introspection<dim> &introspection) const;
-
-        /**
-         * Return a string that describes the field type and the compositional
-         * variable number and name, if applicable.
-         */
-        std::string
-        name(const Introspection<dim> &introspection) const;
-      };
+      using AdvectionField = aspect::AdvectionField;
 
     private:
 
@@ -569,14 +439,39 @@ namespace aspect
        * This function implements one scheme for the various
        * steps necessary to assemble and solve the nonlinear problem.
        *
-       * If `single Advection, single Stokes' is selected as the nonlinear solver scheme,
-       * no nonlinear iterations are done, and the temperature, compositional fields and
-       * Stokes equations are solved exactly once per time step, one after the other.
+       * The `no Advection, no Stokes' scheme skips solving the temperature,
+       * composition and Stokes equations, which permits to go directly to
+       * postprocessing after setting up the initial condition.
        *
        * This function is implemented in
        * <code>source/simulator/solver_schemes.cc</code>.
        */
-      void solve_single_advection_single_stokes ();
+      void solve_no_advection_no_stokes ();
+
+      /**
+       * This function implements one scheme for the various
+       * steps necessary to assemble and solve the nonlinear problem.
+       *
+       * The `no Advection, single Stokes' scheme only solves the Stokes system and
+       * ignores compositions and the temperature equation.
+       *
+       * This function is implemented in
+       * <code>source/simulator/solver_schemes.cc</code>.
+       */
+      void solve_no_advection_single_stokes ();
+
+      /**
+       * This function implements one scheme for the various
+       * steps necessary to assemble and solve the nonlinear problem.
+       *
+       * The `no Advection, single Stokes first timestep only' scheme only solves the Stokes system,
+       * for the initial timestep. This results in a `steady state' velocity field for
+       * particle calculations.
+       *
+       * This function is implemented in
+       * <code>source/simulator/solver_schemes.cc</code>.
+       */
+      void solve_no_advection_single_stokes_first_timestep_only ();
 
       /**
        * This function implements one scheme for the various
@@ -596,40 +491,41 @@ namespace aspect
        * This function implements one scheme for the various
        * steps necessary to assemble and solve the nonlinear problem.
        *
-       * The `no Advection, single Stokes' scheme only solves the Stokes system and
-       * ignores compositions and the temperature equation.
+       * The `no Advection, iterated defect correction Stokes' scheme
+       * does not solve the temperature and composition equations
+       * but only iterates out the solution of the Stokes
+       * equation using Defect Correction (DC) Picard iterations.
        *
        * This function is implemented in
        * <code>source/simulator/solver_schemes.cc</code>.
        */
-      void solve_no_advection_single_stokes ();
+      void solve_no_advection_iterated_defect_correction_stokes ();
 
       /**
        * This function implements one scheme for the various
        * steps necessary to assemble and solve the nonlinear problem.
        *
-       * The `first timestep only, single Stokes' scheme only solves the Stokes system,
-       * for the initial timestep. This results in a `steady state' velocity field for
-       * particle calculations.
+       * The `single Advection, no Stokes' scheme only solves the temperature and other
+       * advection systems and instead of solving for the Stokes system,
+       * a prescribed velocity and pressure is used."
        *
        * This function is implemented in
        * <code>source/simulator/solver_schemes.cc</code>.
        */
-      void solve_first_timestep_only_single_stokes ();
+      void solve_single_advection_no_stokes ();
 
       /**
        * This function implements one scheme for the various
        * steps necessary to assemble and solve the nonlinear problem.
        *
-       * The `iterated Advection and Stokes' scheme iterates
-       * by alternating the solution of the temperature, composition and Stokes systems.
-       * This is essentially a type of Picard iterations for the whole
-       * system of equations.
+       * If `single Advection, single Stokes' is selected as the nonlinear solver scheme,
+       * no nonlinear iterations are done, and the temperature, compositional fields and
+       * Stokes equations are solved exactly once per time step, one after the other.
        *
        * This function is implemented in
        * <code>source/simulator/solver_schemes.cc</code>.
        */
-      void solve_iterated_advection_and_stokes ();
+      void solve_single_advection_single_stokes ();
 
       /**
        * This function implements one scheme for the various
@@ -649,20 +545,6 @@ namespace aspect
        * This function implements one scheme for the various
        * steps necessary to assemble and solve the nonlinear problem.
        *
-       * The `no Advection, iterated defect correction Stokes' scheme
-       * does not solve the temperature and composition equations
-       * but only iterates out the solution of the Stokes
-       * equation using Defect Correction (DC) Picard iterations.
-       *
-       * This function is implemented in
-       * <code>source/simulator/solver_schemes.cc</code>.
-       */
-      void solve_no_advection_iterated_defect_correction_stokes ();
-
-      /**
-       * This function implements one scheme for the various
-       * steps necessary to assemble and solve the nonlinear problem.
-       *
        * The `single Advection, iterated defect correction Stokes' scheme
        * solves the temperature and composition equations once at the beginning
        * of each time step and then iterates out the solution of the Stokes
@@ -672,6 +554,54 @@ namespace aspect
        * <code>source/simulator/solver_schemes.cc</code>.
        */
       void solve_single_advection_iterated_defect_correction_stokes ();
+
+      /**
+       * This function implements one scheme for the various
+       * steps necessary to assemble and solve the nonlinear problem.
+       *
+       * The `single Advection, iterated Newton Stokes' scheme solves the temperature and
+       * composition equations once at the beginning of each time step
+       * and then iterates out the solution of the Stokes equation using Newton iterations.
+       * For the Stokes system it is able to switch from a defect correction form of
+       * Picard iterations to Newton iterations after a certain tolerance or
+       * number of iterations is reached. This can greatly improve the
+       * convergence rate for particularly nonlinear viscosities.
+       *
+       * @param use_newton_iterations Sets whether this function should only use defect
+       * correction iterations (use_newton_iterations = false) or also use Newton iterations
+       * (use_newton_iterations = true).
+       *
+       * This function is implemented in
+       * <code>source/simulator/solver_schemes.cc</code>.
+       */
+      void solve_single_advection_iterated_newton_stokes (bool use_newton_iterations);
+
+      /**
+       * This function implements one scheme for the various
+       * steps necessary to assemble and solve the nonlinear problem.
+       *
+       * The `iterated Advection, no Stokes' scheme iterates the temperature and other
+       * advection systems and instead of solving for the Stokes system,
+       * a prescribed velocity and pressure are used."
+       *
+       * This function is implemented in
+       * <code>source/simulator/solver_schemes.cc</code>.
+       */
+      void solve_iterated_advection_no_stokes ();
+
+      /**
+       * This function implements one scheme for the various
+       * steps necessary to assemble and solve the nonlinear problem.
+       *
+       * The `iterated Advection and Stokes' scheme iterates
+       * by alternating the solution of the temperature, composition and Stokes systems.
+       * This is essentially a type of Picard iterations for the whole
+       * system of equations.
+       *
+       * This function is implemented in
+       * <code>source/simulator/solver_schemes.cc</code>.
+       */
+      void solve_iterated_advection_and_stokes ();
 
       /**
        * This function implements one scheme for the various
@@ -707,53 +637,6 @@ namespace aspect
        * <code>source/simulator/solver_schemes.cc</code>.
        */
       void solve_iterated_advection_and_newton_stokes (bool use_newton_iterations);
-
-      /**
-       * This function implements one scheme for the various
-       * steps necessary to assemble and solve the nonlinear problem.
-       *
-       * The `single Advection, iterated Newton Stokes' scheme solves the temperature and
-       * composition equations once at the beginning of each time step
-       * and then iterates out the solution of the Stokes equation using Newton iterations.
-       * For the Stokes system it is able to switch from a defect correction form of
-       * Picard iterations to Newton iterations after a certain tolerance or
-       * number of iterations is reached. This can greatly improve the
-       * convergence rate for particularly nonlinear viscosities.
-       *
-       * @param use_newton_iterations Sets whether this function should only use defect
-       * correction iterations (use_newton_iterations = false) or also use Newton iterations
-       * (use_newton_iterations = true).
-       *
-       * This function is implemented in
-       * <code>source/simulator/solver_schemes.cc</code>.
-       */
-      void solve_single_advection_and_iterated_newton_stokes (bool use_newton_iterations);
-
-      /**
-       * This function implements one scheme for the various
-       * steps necessary to assemble and solve the nonlinear problem.
-       *
-       * The `single Advection, no Stokes' scheme only solves the temperature and other
-       * advection systems and instead of solving for the Stokes system,
-       * a prescribed velocity and pressure is used."
-       *
-       * This function is implemented in
-       * <code>source/simulator/solver_schemes.cc</code>.
-       */
-      void solve_single_advection_no_stokes ();
-
-      /**
-       * This function implements one scheme for the various
-       * steps necessary to assemble and solve the nonlinear problem.
-       *
-       * The `no Advection, no Stokes' scheme skips solving the temperature,
-       * composition and Stokes equations, which permits to go directly to
-       * postprocessing after setting up the initial condition.
-       *
-       * This function is implemented in
-       * <code>source/simulator/solver_schemes.cc</code>.
-       */
-      void solve_no_advection_no_stokes ();
 
       /**
        * Initiate the assembly of the Stokes preconditioner matrix via
@@ -997,6 +880,14 @@ namespace aspect
        * restarting from a saved state
        * @{
        */
+
+      /**
+       * Determine the id of the last good snapshot that was written by reading
+       * the last_good_checkpoint.txt file from the output/checkpoint/ folder.
+       * It will return numbers::invalid_unsigned_int if no snapshot exists.
+       */
+      unsigned int determine_last_good_snapshot() const;
+
       /**
        * Save the state of this program to a set of files in the output
        * directory. In reality, however, only some variables are stored (in
@@ -1258,35 +1149,6 @@ namespace aspect
       void get_artificial_viscosity (Vector<T> &viscosity_per_cell,
                                      const AdvectionField &advection_field,
                                      const bool skip_interior_cells = false) const;
-
-      /**
-       * Compute the seismic shear wave speed, Vs anomaly per element. we
-       * compute the anomaly by computing a smoothed (over 200 km or so)
-       * laterally averaged temperature profile and associated seismic
-       * velocity that is then subtracted from the seismic velocity at the
-       * current pressure temperature conditions
-       *
-       * @param values The output vector of depth averaged values. The
-       * function takes the pre-existing size of this vector as the number of
-       * depth slices.
-       */
-      void compute_Vs_anomaly(Vector<float> &values) const;
-
-      /**
-       * Compute the seismic pressure wave speed, Vp anomaly per element. we
-       * compute the anomaly by computing a smoothed (over 200 km or so)
-       * laterally averaged temperature profile and associated seismic
-       * velocity that is then subtracted from the seismic velocity at the
-       * current pressure temperature conditions
-       *
-       * This function is implemented in
-       * <code>source/simulator/helper_functions.cc</code>.
-       *
-       * @param values The output vector of depth averaged values. The
-       * function takes the pre-existing size of this vector as the number of
-       * depth slices.
-       */
-      void compute_Vp_anomaly(Vector<float> &values) const;
 
       /**
        * Adjust the pressure variable (which is only determined up to
@@ -1555,7 +1417,9 @@ namespace aspect
        * This function is implemented in
        * <code>source/simulator/helper_functions.cc</code>.
        */
-      void replace_outflow_boundary_ids(const unsigned int boundary_id_offset);
+      void replace_outflow_boundary_ids(const unsigned int boundary_id_offset,
+                                        const bool is_composition,
+                                        const unsigned int composition_index);
 
       /**
        * Undo the offset of the boundary ids done in replace_outflow_boundary_ids
@@ -1646,8 +1510,8 @@ namespace aspect
        * This function is implemented in
        * <code>source/simulator/helper_functions.cc</code>.
        */
-      bool maybe_write_checkpoint (const time_t last_checkpoint_time,
-                                   const bool force_writing_checkpoint);
+      bool maybe_write_checkpoint (const std::time_t last_checkpoint_time,
+                                   const bool        force_writing_checkpoint);
 
       /**
        * Check if we should do an initial refinement cycle in this timestep.
@@ -1937,6 +1801,13 @@ namespace aspect
       double total_walltime_until_last_snapshot;
 
       /**
+       * Checkpointing happens in rotating folders /restart/01/, /restart/02/,
+       * etc.. This variable holds the last index used and as such should
+       * contain the last valid checkpoint written.
+       */
+      unsigned int last_checkpoint_id;
+
+      /**
        * In output_statistics(), where we output the statistics object above,
        * we do the actual writing on a separate thread. This variable is the
        * handle we get for this thread so that we can wait for it to finish,
@@ -1953,13 +1824,16 @@ namespace aspect
        * @name Variables that describe the physical setup of the problem
        * @{
        */
-      const std::unique_ptr<InitialTopographyModel::Interface<dim>>          initial_topography_model;
+      const std::shared_ptr<InitialTopographyModel::Interface<dim>>          initial_topography_model;
       const std::unique_ptr<GeometryModel::Interface<dim>>                   geometry_model;
       const IntermediaryConstructorAction                                    post_geometry_model_creation_action;
       const std::unique_ptr<MaterialModel::Interface<dim>>                   material_model;
       const std::unique_ptr<GravityModel::Interface<dim>>                    gravity_model;
+
       BoundaryTemperature::Manager<dim>                                      boundary_temperature_manager;
+      BoundaryConvectiveHeating::Manager<dim>                                boundary_convective_heating_manager;
       BoundaryComposition::Manager<dim>                                      boundary_composition_manager;
+      PrescribedSolution::Manager<dim>                                       prescribed_solution_manager;
       const std::unique_ptr<PrescribedStokesSolution::Interface<dim>>        prescribed_stokes_solution;
 
       /**
@@ -1988,16 +1862,11 @@ namespace aspect
        * after this point, it needs to keep its own shared pointer
        * to it.
        */
-      std::shared_ptr<WorldBuilder::World>                                   world_builder;
+      std::shared_ptr<WorldBuilder::World>                      world_builder;
 #endif
-      BoundaryVelocity::Manager<dim>                                         boundary_velocity_manager;
-      BoundaryTraction::Manager<dim>                                         boundary_traction_manager;
-      const std::unique_ptr<BoundaryHeatFlux::Interface<dim>>                boundary_heat_flux;
-
-      /**
-       * The managers holding different sets of particles
-       */
-      std::vector<Particle::Manager<dim>> particle_managers;
+      BoundaryVelocity::Manager<dim>                            boundary_velocity_manager;
+      BoundaryTraction::Manager<dim>                            boundary_traction_manager;
+      const std::unique_ptr<BoundaryHeatFlux::Interface<dim>>   boundary_heat_flux;
 
       /**
        * @}
@@ -2054,13 +1923,18 @@ namespace aspect
        * a MappingQ1Eulerian object to describe the mesh deformation,
        * swapping it in for the original MappingQ or MappingCartesian object.
        */
-      std::unique_ptr<Mapping<dim>>                            mapping;
+      std::unique_ptr<Mapping<dim>>                             mapping;
 
       const FESystem<dim>                                       finite_element;
 
       DoFHandler<dim>                                           dof_handler;
 
       Postprocess::Manager<dim>                                 postprocess_manager;
+
+      /**
+       * The managers holding different sets of particles
+       */
+      std::vector<Particle::Manager<dim>>                       particle_managers;
 
       /**
        * Constraint objects. The first of these describes all constraints that
@@ -2073,8 +1947,8 @@ namespace aspect
        * 'constraints' is computed in setup_dofs(), 'current_constraints' is
        * done in compute_current_constraints().
        */
-      AffineConstraints<double>                                          constraints;
-      AffineConstraints<double>                                          current_constraints;
+      AffineConstraints<double>                                 constraints;
+      AffineConstraints<double>                                 current_constraints;
 
       /**
        * A place to store the latest correction computed by normalize_pressure().
@@ -2187,11 +2061,11 @@ namespace aspect
 
       friend class boost::serialization::access;
       friend class SimulatorAccess<dim>;
-      friend class MeshDeformation::MeshDeformationHandler<dim>;   // MeshDeformationHandler needs access to the internals of the Simulator
-      friend class VolumeOfFluidHandler<dim>; // VolumeOfFluidHandler needs access to the internals of the Simulator
+      friend class MeshDeformation::MeshDeformationHandler<dim>;
+      friend class VolumeOfFluidHandler<dim>;
       friend class StokesMatrixFreeHandler<dim>;
-      template <int dimension, int velocity_degree>
-      friend class StokesMatrixFreeHandlerImplementation;
+      template <int dimension, int velocity_degree> friend class StokesMatrixFreeHandlerLocalSmoothingImplementation;
+      template <int dimension, int velocity_degree> friend class StokesMatrixFreeHandlerGlobalCoarseningImplementation;
       friend struct Parameters<dim>;
   };
 }

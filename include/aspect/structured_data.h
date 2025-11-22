@@ -308,7 +308,7 @@ namespace aspect
         /**
          * Number of points in the data grid as specified in the data file.
          */
-        TableIndices<dim> table_points;
+        TableIndices<dim> points_per_direction;
 
         /**
          * Scales the data boundary condition by a scalar factor. Can be used
@@ -376,7 +376,7 @@ namespace aspect
         /**
          * Scale the data by a scalar factor. Can be used to transform the
          * unit of the data (if they are not specified in SI units (m/s or
-         * m/yr depending on the "Use years in output instead of seconds"
+         * m/yr depending on the "Use years instead of seconds"
          * parameter).
          */
         double scale_factor;
@@ -685,12 +685,6 @@ namespace aspect
         std::vector<std::unique_ptr<aspect::Utilities::StructuredDataLookup<dim-1>>> lookups;
 
       private:
-
-        /**
-         * Directory in which the data files are present.
-         */
-        std::string data_directory;
-
         /**
          * Filenames of data files.
          */

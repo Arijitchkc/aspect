@@ -42,7 +42,7 @@ namespace aspect
           /**
            * Constructor.
            */
-          SphericalManifoldWithTopography(const InitialTopographyModel::Interface<dim> &topography,
+          SphericalManifoldWithTopography(const std::shared_ptr<const InitialTopographyModel::Interface<dim>> topography,
                                           const double inner_radius,
                                           const double outer_radius);
 
@@ -147,23 +147,22 @@ namespace aspect
           virtual Point<dim>
           get_new_point(const ArrayView<const Point<dim>> &vertices,
                         const ArrayView<const double>          &weights) const override;
-
-        private:
-          /**
-           * A pointer to the topography model.
-           */
-          const InitialTopographyModel::Interface<dim> *topo;
-
-          /**
-           * Inner and outer radii of the spherical shell.
-           */
-          const double R0, R1;
-
           /**
            * Return the topography of the surface directly above the point given
            * by the coordinates stored in the argument.
            */
           double topography_for_point (const Point<dim> &x_y_z) const;
+
+        private:
+          /**
+           * A pointer to the topography model.
+           */
+          const std::shared_ptr<const InitialTopographyModel::Interface<dim>> topo;
+
+          /**
+           * Inner and outer radii of the spherical shell.
+           */
+          const double R0, R1;
       };
 
     }
@@ -303,7 +302,7 @@ namespace aspect
         /**
          * Return whether the given point lies within the domain specified
          * by the geometry. This function does not take into account
-         * initial or dynamic surface topography.
+         * dynamic surface topography.
          */
         bool
         point_is_in_domain(const Point<dim> &point) const override;
@@ -330,10 +329,7 @@ namespace aspect
 
 
         /**
-         * Declare the parameters this class takes through input files. The
-         * default implementation of this function does not describe any
-         * parameters. Consequently, derived classes do not have to overload
-         * this function if they do not take any runtime parameters.
+         * Declare the parameters this class takes through input files.
          */
         static
         void
@@ -341,9 +337,6 @@ namespace aspect
 
         /**
          * Read the parameters this class declares from the parameter file.
-         * The default implementation of this function does not read any
-         * parameters. Consequently, derived classes do not have to overload
-         * this function if they do not take any runtime parameters.
          */
         void
         parse_parameters (ParameterHandler &prm) override;

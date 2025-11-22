@@ -28,7 +28,10 @@
 
 #include <deal.II/particles/particle_handler.h>
 #include <deal.II/base/data_out_base.h>
+
+#include <random>
 #include <tuple>
+
 
 namespace aspect
 {
@@ -78,6 +81,23 @@ namespace aspect
         required_other_postprocessors () const override;
 
         /**
+         * Save the state of this object.
+         */
+        void save (std::map<std::string, std::string> &status_strings) const override;
+
+        /**
+         * Restore the state of the object.
+         */
+        void load (const std::map<std::string, std::string> &status_strings) override;
+
+        /**
+         * Serialize the contents of this class as far as they are not read
+         * from input parameter files.
+         */
+        template <class Archive>
+        void serialize (Archive &ar, const unsigned int version);
+
+        /**
          * Declare the parameters this class takes through input files.
          */
         static
@@ -91,13 +111,6 @@ namespace aspect
         parse_parameters (ParameterHandler &prm) override;
 
       private:
-
-        /**
-         * Stores the simulation end time, so that it always produces output
-         * at the last timestep.
-         */
-        double end_time;
-
         /**
          * Enums specifying what information to write:
          *

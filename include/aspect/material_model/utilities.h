@@ -28,6 +28,9 @@
 #include <deal.II/base/signaling_nan.h>
 #include <deal.II/base/parameter_handler.h>
 
+#include <mpi.h>
+
+
 namespace aspect
 {
   template <int dim> class SimulatorAccess;

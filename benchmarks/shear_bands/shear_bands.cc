@@ -140,7 +140,8 @@ namespace aspect
             }
 
           // fill melt outputs if they exist
-          aspect::MaterialModel::MeltOutputs<dim> *melt_out = out.template get_additional_output<aspect::MaterialModel::MeltOutputs<dim>>();
+          const std::shared_ptr<aspect::MaterialModel::MeltOutputs<dim>> melt_out
+            = out.template get_additional_output_object<aspect::MaterialModel::MeltOutputs<dim>>();
 
           if (melt_out != nullptr)
             for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
@@ -202,22 +203,22 @@ namespace aspect
           prm.declare_entry ("Reference solid density", "3000",
                              Patterns::Double (0),
                              "Reference density of the solid $\\rho_{s,0}$. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
           prm.declare_entry ("Reference melt density", "3000",
                              Patterns::Double (0),
                              "Reference density of the melt/fluid$\\rho_{f,0}$. "
-                             "Units: \\si{\\kilogram\\per\\meter\\cubed}.");
+                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
           prm.declare_entry ("Reference shear viscosity", "1.41176e7",
                              Patterns::Double (0),
                              "The value of the constant viscosity $\\eta_0$ of the solid matrix. "
-                             "Units: \\si{\\pascal\\second}.");
+                             "Units: $\\text{Pa}\\text{s}$.");
           prm.declare_entry ("Reference compaction viscosity", "1.41176e8",
                              Patterns::Double (0),
                              "The value of the constant volumetric viscosity $\\xi_0$ of the solid matrix. "
-                             "Units: \\si{\\pascal\\second}.");
+                             "Units: $\\text{Pa}\\text{s}$.");
           prm.declare_entry ("Reference melt viscosity", "100.0",
                              Patterns::Double (0),
-                             "The value of the constant melt viscosity $\\eta_f$. Units: \\si{\\pascal\\second}.");
+                             "The value of the constant melt viscosity $\\eta_f$. Units: $\\text{Pa}\\text{s}$.");
           prm.declare_entry ("Reference permeability", "5e-9",
                              Patterns::Double(),
                              "Reference permeability of the solid host rock."

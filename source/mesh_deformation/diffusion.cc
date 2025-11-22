@@ -182,10 +182,10 @@ namespace aspect
       LinearAlgebra::SparseMatrix matrix;
 
       // Sparsity of the matrix
-      TrilinosWrappers::SparsityPattern sp (mesh_locally_owned,
-                                            mesh_locally_owned,
-                                            mesh_locally_relevant,
-                                            this->get_mpi_communicator());
+      LinearAlgebra::DynamicSparsityPattern sp (mesh_locally_owned,
+                                                mesh_locally_owned,
+                                                mesh_locally_relevant,
+                                                this->get_mpi_communicator());
       DoFTools::make_sparsity_pattern (mesh_deformation_dof_handler, sp, matrix_constraints, false,
                                        Utilities::MPI::this_mpi_process(this->get_mpi_communicator()));
 
@@ -226,7 +226,7 @@ namespace aspect
       std::vector<Tensor<1, dim>> initial_topography_values(n_fs_face_q_points);
 
       // The global displacements on the MeshDeformation FE
-      LinearAlgebra::Vector displacements = this->get_mesh_deformation_handler().get_mesh_displacements();
+      const LinearAlgebra::Vector &displacements = this->get_mesh_deformation_handler().get_mesh_displacements();
 
       // The global initial topography on the MeshDeformation FE
       // TODO Once the initial mesh deformation is ready, this
@@ -373,7 +373,21 @@ namespace aspect
       this->get_pcout() << "   Solving mesh surface diffusion" << std::endl;
       SolverControl solver_control(5*system_rhs.size(), this->get_parameters().linear_stokes_solver_tolerance*system_rhs.l2_norm());
       SolverCG<LinearAlgebra::Vector> cg(solver_control);
-      cg.solve (matrix, solution, system_rhs, preconditioner_mass);
+      try
+        {
+          cg.solve (matrix, solution, system_rhs, preconditioner_mass);
+        }
+      catch (const std::exception &exc)
+        {
+          // if the solver fails, report the error from processor 0 with some additional
+          // information about its location, and throw a quiet exception on all other
+          // processors
+          Utilities::throw_linear_solver_failure_exception("iterative diffusion surface deformation solver",
+                                                           "MeshDeformation::Diffusion::diffuse_boundary()",
+                                                           std::vector<SolverControl> {solver_control},
+                                                           exc,
+                                                           this->get_mpi_communicator());
+        }
 
       // Distribute constraints on mass matrix
       matrix_constraints.distribute (solution);
@@ -443,7 +457,7 @@ namespace aspect
     void
     Diffusion<dim>::compute_velocity_constraints_on_boundary(const DoFHandler<dim> &mesh_deformation_dof_handler,
                                                              AffineConstraints<double> &mesh_velocity_constraints,
-                                                             const std::set<types::boundary_id> &boundary_id) const
+                                                             const std::set<types::boundary_id> &boundary_ids) const
     {
       if (!apply_diffusion)
         return;
@@ -458,22 +472,27 @@ namespace aspect
       // Determine the mesh velocity at the surface based on diffusion of
       // the topography
       diffuse_boundary(mesh_deformation_dof_handler, mesh_locally_owned,
-                       mesh_locally_relevant, boundary_velocity, boundary_id);
+                       mesh_locally_relevant, boundary_velocity, boundary_ids);
 
       // now insert the relevant part of the solution into the mesh constraints
       const IndexSet constrained_dofs =
         DoFTools::extract_boundary_dofs(mesh_deformation_dof_handler,
                                         ComponentMask(dim, true),
-                                        boundary_id);
+                                        boundary_ids);
 
-      for (unsigned int i = 0; i < constrained_dofs.n_elements();  ++i)
+      for (const types::global_dof_index index : constrained_dofs)
         {
-          types::global_dof_index index = constrained_dofs.nth_index_in_set(i);
           if (mesh_velocity_constraints.can_store_line(index))
             if (mesh_velocity_constraints.is_constrained(index)==false)
               {
+#if DEAL_II_VERSION_GTE(9,6,0)
+                mesh_velocity_constraints.add_constraint(index,
+                                                         {},
+                                                         boundary_velocity[index]);
+#else
                 mesh_velocity_constraints.add_line(index);
                 mesh_velocity_constraints.set_inhomogeneity(index, boundary_velocity[index]);
+#endif
               }
         }
     }
