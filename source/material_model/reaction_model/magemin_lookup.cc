@@ -1,7 +1,6 @@
 /**
- * Initial implementation of magemin using a lookup table
+ * Implementation of MAGEMin in ASPECT as an external library
  */
-
 #include "aspect/material_model/interface.h"
 #include "aspect/material_model/reactive_fluid_transport.h"
 #include <aspect/adiabatic_conditions/interface.h>
