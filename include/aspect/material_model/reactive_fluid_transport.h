@@ -21,17 +21,16 @@
 #ifndef _aspect_material_model_reactive_fluid_transport_h
 #define _aspect_material_model_reactive_fluid_transport_h
 
-#include <aspect/geometry_model/interface.h>
 #include <aspect/material_model/interface.h>
-#include <aspect/melt.h>
 #include <aspect/simulator_access.h>
-#include <aspect/utilities.h>
-
-// #include <MAGEMin_cpp.h>
-#include <aspect/material_model/reaction_model/katz2003_mantle_melting.h>
-#include <aspect/material_model/reaction_model/magemin_lookup.h>
-#include <aspect/material_model/reaction_model/tian2019_solubility.h>
 #include <aspect/melt.h>
+#include <aspect/utilities.h>
+#include <aspect/geometry_model/interface.h>
+
+#include <aspect/melt.h>
+#include <aspect/material_model/reaction_model/katz2003_mantle_melting.h>
+#include <aspect/material_model/reaction_model/tian2019_solubility.h>
+#include <aspect/material_model/reaction_model/magemin_lookup.h>
 
 namespace aspect {
 namespace MaterialModel {

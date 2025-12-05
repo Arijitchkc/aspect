@@ -18,9 +18,8 @@
   <http://www.gnu.org/licenses/>.
 */
 
-#include <aspect/adiabatic_conditions/interface.h>
 #include <aspect/material_model/reactive_fluid_transport.h>
-#include <deal.II/base/exceptions.h>
+#include <aspect/adiabatic_conditions/interface.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/numerics/fe_field_function.h>
 
@@ -31,10 +30,14 @@ template <int dim> bool ReactiveFluidTransport<dim>::is_compressible() const {
 }
 
 template <int dim>
-double ReactiveFluidTransport<dim>::reference_darcy_coefficient() const {
-  if (fluid_solid_reaction_scheme == katz2003) {
+double ReactiveFluidTransport<dim>::reference_darcy_coefficient() const 
+{
+  if (fluid_solid_reaction_scheme == katz2003) 
+  {
     return katz2003_model.reference_darcy_coefficient();
-  } else {
+  } 
+  else 
+  {
     // 0.01 = 1% melt
     return reference_permeability * Utilities::fixed_power<3>(0.01) / eta_f;
   }
@@ -147,6 +150,9 @@ template <int dim>
 void ReactiveFluidTransport<dim>::evaluate(
     const typename Interface<dim>::MaterialModelInputs &in,
     typename Interface<dim>::MaterialModelOutputs &out) const {
+
+  base_model->evaluate(in,out);
+
   if (fluid_solid_reaction_scheme != katz2003 &&
       fluid_solid_reaction_scheme != magemin) {
     const unsigned int porosity_idx =
@@ -444,7 +450,7 @@ void ReactiveFluidTransport<dim>::declare_parameters(ParameterHandler &prm) {
       prm.declare_entry(
           "Fluid-solid reaction scheme", "no reaction",
           Patterns::Selection(
-              "no reaction|zero solubility|tian approximation|katz2003"),
+              "no reaction|zero solubility|tian approximation|katz2003|magemin"),
           "Select what type of scheme to use for reactions between fluid and "
           "solid phases. "
           "The current available options are models where no reactions occur "
@@ -638,71 +644,71 @@ void ReactiveFluidTransport<dim>::parse_parameters(ParameterHandler &prm) {
   }
   prm.leave_subsection();
 
-  if (fluid_solid_reaction_scheme == magemin) {
-    // mageM.initialize();
-    // // #ifdef ASPECT_WITH_MAGEMin
-    // std::cout
-    //     << "Testing if magemin call is successful or not ||| Fingers
-    //     crossed.";
-    // // Test if the magemin functions are accessible
-    // double TemperatureDummy = 1200 + 273; // in Kelvin
-    // double PressureDummy = 32;            // in kbar
-    // int len_oxides = 11;
-    // char *database = "ig";
-    // std::vector<double> bulkComposition{38.494, 1.776, 2.824, 50.566,
-    //                                     5.886,  0.01,  0.25,  0.1,
-    //                                     0.096,  0.109, 0.0};
-    // stableAssemblage sAssemblage;
-    // if (database == "ig") {
-    //   sAssemblage.oxideNames = {"SiO2", "AL2O3", "CaO", "MgO",   "FeOt",
-    //   "K2O",
-    //                             "Na2O", "TiO2",  "O",   "Cr2O3", "H2O"};
-    //   sAssemblage.solutionNames = {"SYS", "spl", "bi", "cd",   "cpx",
-    //                                "opx", "ep",  "g",  "amp",  "ilm",
-    //                                "liq", "mu",  "ol", "pl3T", "fl"};
-    // }
-    // MAGEMin_wrapper wrap;
-    // int arg1;
-    // char **argv2;
-    // wrap.executeMAGEMin(arg1, argv2, TemperatureDummy, PressureDummy,
-    //                     len_oxides, database, bulkComposition,
-    //                     &sAssemblage);
-    // std::cout << "MAGEMin ran successfully. Moving on to print them";
-    // // Test Lines end;
-    // //
-    // //
-    // for (size_t i = 0; i < sAssemblage.len_oxides; i++) {
-    //   std::cout << sAssemblage.oxideNames[i] << "     ";
-    // }
-    // std::cout << "\n";
-    // for (size_t i = 0; i < sAssemblage.solutionNames.size(); i++) {
-    //   std::cout << sAssemblage.solutionNames[i];
-    //   for (size_t j = 0; j < sAssemblage.len_oxides; j++) {
-    //     std::cout << "   " << sAssemblage.oxideCompositions[i][j];
-    //   }
-    //   std::cout << "\n";
-    // }
-    //
-    // printf(
-    //     "\n\n\n%6s%15s %13s %17s %17s %12s %12s %12s %12s %12s %12s %12s
-    //     %12s
-    //     "
-    //     "%12s\n",
-    //     "phase", "fraction[wt]", "G[J]", "V_molar[cm3/mol]",
-    //     "V_partial[cm3]", "Cp[kJ/K]", "Rho[kg/m3]", "Alpha[1/K]",
-    //     "Entropy[J/K]", "Enthalpy[J]", "BulkMod[GPa]", "ShearMod[GPa]",
-    //     "Vp[km/s]", "Vs[km/s]");
-    // for (size_t i = 0; i < sAssemblage.solutionNames.size(); i++) {
-    //   std::cout << sAssemblage.solutionNames[i];
-    //   for (size_t j = 0; j < sAssemblage.stablePhasesProperties[i].size();
-    //        j++) {
-    //     std::cout << "  " << sAssemblage.stablePhasesProperties[i][j];
-    //   }
-    //   std::cout << "\n";
-    // }
-    // // #endif // ASPECT_WITH_MAGEMin
-    mageM.initializeNewandModern();
-  }
+  // if (fluid_solid_reaction_scheme == magemin) {
+  //   // mageM.initialize();
+  //   // // #ifdef ASPECT_WITH_MAGEMin
+  //   // std::cout
+  //   //     << "Testing if magemin call is successful or not ||| Fingers
+  //   //     crossed.";
+  //   // // Test if the magemin functions are accessible
+  //   // double TemperatureDummy = 1200 + 273; // in Kelvin
+  //   // double PressureDummy = 32;            // in kbar
+  //   // int len_oxides = 11;
+  //   // char *database = "ig";
+  //   // std::vector<double> bulkComposition{38.494, 1.776, 2.824, 50.566,
+  //   //                                     5.886,  0.01,  0.25,  0.1,
+  //   //                                     0.096,  0.109, 0.0};
+  //   // stableAssemblage sAssemblage;
+  //   // if (database == "ig") {
+  //   //   sAssemblage.oxideNames = {"SiO2", "AL2O3", "CaO", "MgO",   "FeOt",
+  //   //   "K2O",
+  //   //                             "Na2O", "TiO2",  "O",   "Cr2O3", "H2O"};
+  //   //   sAssemblage.solutionNames = {"SYS", "spl", "bi", "cd",   "cpx",
+  //   //                                "opx", "ep",  "g",  "amp",  "ilm",
+  //   //                                "liq", "mu",  "ol", "pl3T", "fl"};
+  //   // }
+  //   // MAGEMin_wrapper wrap;
+  //   // int arg1;
+  //   // char **argv2;
+  //   // wrap.executeMAGEMin(arg1, argv2, TemperatureDummy, PressureDummy,
+  //   //                     len_oxides, database, bulkComposition,
+  //   //                     &sAssemblage);
+  //   // std::cout << "MAGEMin ran successfully. Moving on to print them";
+  //   // // Test Lines end;
+  //   // //
+  //   // //
+  //   // for (size_t i = 0; i < sAssemblage.len_oxides; i++) {
+  //   //   std::cout << sAssemblage.oxideNames[i] << "     ";
+  //   // }
+  //   // std::cout << "\n";
+  //   // for (size_t i = 0; i < sAssemblage.solutionNames.size(); i++) {
+  //   //   std::cout << sAssemblage.solutionNames[i];
+  //   //   for (size_t j = 0; j < sAssemblage.len_oxides; j++) {
+  //   //     std::cout << "   " << sAssemblage.oxideCompositions[i][j];
+  //   //   }
+  //   //   std::cout << "\n";
+  //   // }
+  //   //
+  //   // printf(
+  //   //     "\n\n\n%6s%15s %13s %17s %17s %12s %12s %12s %12s %12s %12s %12s
+  //   //     %12s
+  //   //     "
+  //   //     "%12s\n",
+  //   //     "phase", "fraction[wt]", "G[J]", "V_molar[cm3/mol]",
+  //   //     "V_partial[cm3]", "Cp[kJ/K]", "Rho[kg/m3]", "Alpha[1/K]",
+  //   //     "Entropy[J/K]", "Enthalpy[J]", "BulkMod[GPa]", "ShearMod[GPa]",
+  //   //     "Vp[km/s]", "Vs[km/s]");
+  //   // for (size_t i = 0; i < sAssemblage.solutionNames.size(); i++) {
+  //   //   std::cout << sAssemblage.solutionNames[i];
+  //   //   for (size_t j = 0; j < sAssemblage.stablePhasesProperties[i].size();
+  //   //        j++) {
+  //   //     std::cout << "  " << sAssemblage.stablePhasesProperties[i][j];
+  //   //   }
+  //   //   std::cout << "\n";
+  //   // }
+  //   // // #endif // ASPECT_WITH_MAGEMin
+  //   // mageM.initializeNewandModern();
+  // }
   // After parsing the parameters for this model, parse parameters related to
   // the base model.
   base_model->parse_parameters(prm);

@@ -14,189 +14,180 @@
 #include <MAGEMin_cpp.h>
 // #endif
 
-namespace aspect {
-namespace MaterialModel {
-namespace ReactionModel {
-struct magelookupFile {
-  std::string compositionName;
-  std::vector<double> Pressure;
-  std::vector<double> Temperature;
-  std::vector<std::vector<double>> materialProperties;
-};
+namespace aspect 
+{
+  namespace MaterialModel 
+    {
+      namespace ReactionModel 
+      {
+        struct magelookupFile 
+        {
+          std::string compositionName;
+          std::vector<double> Pressure;
+          std::vector<double> Temperature;
+          std::vector<std::vector<double>> materialProperties;
+        };
 
-namespace internal {
-class readLookUpTable {
-public:
-  readLookUpTable(const std::string &filename, const MPI_Comm comm);
+        namespace internal2 
+        {
+          class readLookUpTableFunky 
+          {
+            public:
+              // readLookUpTable(const std::string &filename);
 
-  std::vector<std::vector<double>> getData() const;
-  std::vector<std::vector<double>> data_magemin;
-  // private:
-};
-} // namespace internal
+              readLookUpTableFunky(
+                  std::string data_directory_magemin,
+                  std::vector<std::string> &compositionalLookupFileNames,
+                  std::vector<std::string> &compositionalLookupNames,
+                  std::vector<std::unique_ptr<magelookupFile>> &magelookupFiles,
+                  const MPI_Comm comm);
+              magelookupFile getData() const;
+            private:
+              magelookupFile magelF;
+          };
+        } // namespace internal2
 
-namespace internal2 {
-class readLookUpTableFunky {
-public:
-  // readLookUpTable(const std::string &filename);
+        template <int dim> class mageminLookup : public ::aspect::SimulatorAccess<dim> {
+        public:
+          // constructor
+          mageminLookup();
+          // Make object for MAGEMin class
+          mutable stableAssemblage sAssemblage;
+          mutable MAGEMin_wrapper wrap;
 
-  readLookUpTableFunky(
-      std::string data_directory_magemin,
-      std::vector<std::string> &compositionalLookupFileNames,
-      std::vector<std::string> &compositionalLookupNames,
-      std::vector<std::unique_ptr<magelookupFile>> &magelookupFiles,
-      const MPI_Comm comm);
-  magelookupFile getData() const;
-  // std::vector<std::vector<double>> data_magemin;
-private:
-  magelookupFile magelF;
-  // private:
-};
-} // namespace internal2
+          // create a pointer to the structure holding magemin lookuptable properties
 
-template <int dim> class mageminLookup : public ::aspect::SimulatorAccess<dim> {
-public:
-  // constructor
-  mageminLookup();
-  // Make object for MAGEMin class
-  mutable MAGEMin_wrapper wrap;
+          std::vector<std::unique_ptr<magelookupFile>> magelookupFiles;
+          std::unique_ptr<internal2::readLookUpTableFunky> allDataPtr;
 
-  // create a pointer to the structure holding magemin lookuptable properties
+          std::vector<std::string> fileNames;
 
-  std::vector<std::unique_ptr<magelookupFile>> magelookupFiles;
-  std::unique_ptr<internal2::readLookUpTableFunky> allDataPtr;
+          std::vector<std::string> compositionalLookupNames;
+          std::vector<std::string> compositionalLookupFileNames;
 
-  std::vector<std::string> fileNames;
+          /**
+          * Declare the parameters this function takes through input files.
+          */
+          static void declare_parameters(ParameterHandler &prm);
 
-  std::vector<std::string> compositionalLookupNames;
-  std::vector<std::string> compositionalLookupFileNames;
+          /**
+          * Read the parameters from the parameter file.
+          */
+          void parse_parameters(ParameterHandler &prm);
 
-  /**
-   * Declare the parameters this function takes through input files.
-   */
-  static void declare_parameters(ParameterHandler &prm);
+          /**
+          * Function which for now finds the closest PT datapoint from the lookup table
+          * and fetches required variables
+          */
+          double melt_fraction(const typename Interface<dim>::MaterialModelInputs &in,
+                              unsigned int q) const;
 
-  /**
-   * Read the parameters from the parameter file.
-   */
-  void parse_parameters(ParameterHandler &prm);
+          /**
+          * Function which directly calls MAGEMin
+          */
+          double
+          melt_fractionMAGEMin(const typename Interface<dim>::MaterialModelInputs &in,
+                              typename Interface<dim>::MaterialModelOutputs &out,
+                              unsigned int q) const;
 
-  /**
-   * Function which for now finds the closest PT datapoint from the lookup table
-   * and fetches required variables
-   */
-  double melt_fraction(const typename Interface<dim>::MaterialModelInputs &in,
-                       unsigned int q) const;
+          /**
+          * Function which uses Katz parameterization of solidus lines to predict melt;
+          * just to reduce number of points where we call MAGEMin_cpp
+          */
+          double guess_MeltFraction(double pressure, double temperature) const;
 
-  /**
-   * Function which directly calls MAGEMin
-   */
-  double
-  melt_fractionMAGEMin(const typename Interface<dim>::MaterialModelInputs &in,
-                       typename Interface<dim>::MaterialModelOutputs &out,
-                       unsigned int q) const;
+          void calculate_reaction_rate_outputs(
+              const typename Interface<dim>::MaterialModelInputs &in,
+              typename Interface<dim>::MaterialModelOutputs &out) const;
 
-  /**
-   * Function which uses Katz parameterization of solidus lines to predict melt;
-   * just to reduce number of points where we call MAGEMin_cpp
-   */
-  double guess_MeltFraction(double pressure, double temperature) const;
+          void calculate_fluid_outputs(
+              const typename Interface<dim>::MaterialModelInputs &in,
+              typename Interface<dim>::MaterialModelOutputs &out,
+              const double reference_T) const;
 
-  void calculate_reaction_rate_outputs(
-      const typename Interface<dim>::MaterialModelInputs &in,
-      typename Interface<dim>::MaterialModelOutputs &out) const;
+          void initialize();
 
-  void calculate_fluid_outputs(
-      const typename Interface<dim>::MaterialModelInputs &in,
-      typename Interface<dim>::MaterialModelOutputs &out,
-      const double reference_T) const;
+          void initializeNewandModern();
 
-  void initialize();
+          int get_closest_index(
+              float T, float P,
+              const std::vector<std::unique_ptr<magelookupFile>> &magelookupFiles,
+              int largestCompIndex) const;
 
-  void initializeNewandModern();
+          // struct magelookupFile
+          // {
+          //     std::vector<double> Pressure;
+          //     std::vector<double> Temperature;
+          //     std::vector<std::vector<double>> materialProperties;
+          // };
 
-  int get_closest_index(
-      float T, float P,
-      const std::vector<std::unique_ptr<magelookupFile>> &magelookupFiles,
-      int largestCompIndex) const;
+        private:
+          // void readLookUpTableFunky(std::string data_directory_magemin,
+          // std::vector<std::string>& compositionalLookupFileNames,
+          // std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles);
+          // magelookupFile lF;
 
-  // struct magelookupFile
-  // {
-  //     std::vector<double> Pressure;
-  //     std::vector<double> Temperature;
-  //     std::vector<std::vector<double>> materialProperties;
-  // };
+          // void readLookUpTable(const std::string &filename);
+          // std::vector<std::vector<double>> getData() const;
+          // std::vector<std::vector<double>> data_magemin;
 
-private:
-  // void readLookUpTableFunky(std::string data_directory_magemin,
-  // std::vector<std::string>& compositionalLookupFileNames,
-  // std::vector<std::unique_ptr<magelookupFile>>& magelookupFiles);
-  // magelookupFile lF;
+          double reference_rho_fluid;
+          double xi_0;
+          double viscosity_fluid;
+          double thermal_bulk_viscosity_exponent;
+          double alpha_phi;
+          double extraction_depth;
+          double melt_compressibility;
+          double melt_bulk_modulus_derivative;
+          double depletion_solidus_change;
+          bool fractional_melting;
+          double freezing_rate;
+          double melting_time_scale;
+          double reference_permeability;
+          double cutOff_depth;
 
-  // void readLookUpTable(const std::string &filename);
-  // std::vector<std::vector<double>> getData() const;
-  // std::vector<std::vector<double>> data_magemin;
+          /**
+          * Magemin lookup table Parameters
+          */
+          double crust_min_P;
+          double crust_max_P;
+          double crust_min_T;
+          double crust_max_T;
 
-  double reference_rho_fluid;
-  double xi_0;
-  double viscosity_fluid;
-  double thermal_bulk_viscosity_exponent;
-  double alpha_phi;
-  double extraction_depth;
-  double melt_compressibility;
-  double melt_bulk_modulus_derivative;
-  double depletion_solidus_change;
-  bool fractional_melting;
-  double freezing_rate;
-  double melting_time_scale;
-  double reference_permeability;
-  double cutOff_depth;
+          double mantle_min_P;
+          double mantle_max_P;
+          double mantle_min_T;
+          double mantle_max_T;
 
-  /**
-   * Magemin lookup table Parameters
-   */
-  double crust_min_P;
-  double crust_max_P;
-  double crust_min_T;
-  double crust_max_T;
+          /**
+          * Magemin filepaths
+          */
+          std::string data_directory_magemin;
+          std::string mantle_data_file_name;
+          std::string crust_data_file_name;
 
-  double mantle_min_P;
-  double mantle_max_P;
-  double mantle_min_T;
-  double mantle_max_T;
+          std::vector<std::vector<double>> mantle_data;
+          std::vector<std::vector<double>> crust_data;
 
-  /**
-   * Magemin filepaths
-   */
-  std::string data_directory_magemin;
-  std::string mantle_data_file_name;
-  std::string crust_data_file_name;
-
-  std::unique_ptr<internal::readLookUpTable> mantleLookupData;
-  std::unique_ptr<internal::readLookUpTable> crustLookupData;
-  std::vector<std::vector<double>> mantle_data;
-  std::vector<std::vector<double>> crust_data;
-
-  // Katz parameters for dummy calculations;
-  double A1 = 1085.7;
-  double A2 = 1.329e-7;
-  double A3 = -5.1e-18;
-  double B1 = 1475;
-  double B2 = 8.0e-8;
-  double B3 = -3.2e-18;
-  double C1 = 1780.0;
-  double C2 = 4.50e-8;
-  double C3 = -2.0e-18;
-  double r1 = 0.5;
-  double r2 = 8e-11;
-  double beta = 1.5;
-  double M_cpx = 0.15;
-
-  // std::vector<std::vector<double>> compositionalLookupNames;
-  // std::vector<std::vector<double>> compositionalLookupFileNames;
-};
-} // namespace ReactionModel
-} // namespace MaterialModel
+          // Katz parameters for dummy calculations;
+          double A1 = 1085.7;
+          double A2 = 1.329e-7;
+          double A3 = -5.1e-18;
+          double B1 = 1475;
+          double B2 = 8.0e-8;
+          double B3 = -3.2e-18;
+          double C1 = 1780.0;
+          double C2 = 4.50e-8;
+          double C3 = -2.0e-18;
+          double r1 = 0.5;
+          double r2 = 8e-11;
+          double beta = 1.5;
+          double M_cpx = 0.15;
+          // std::vector<std::vector<double>> compositionalLookupNames;
+          // std::vector<std::vector<double>> compositionalLookupFileNames;
+        };
+      } // namespace ReactionModel
+  } // namespace MaterialModel
 } // namespace aspect
 
 #endif
