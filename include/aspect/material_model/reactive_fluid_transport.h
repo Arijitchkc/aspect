@@ -30,6 +30,7 @@
 #include <aspect/melt.h>
 #include <aspect/material_model/reaction_model/katz2003_mantle_melting.h>
 #include <aspect/material_model/reaction_model/tian2019_solubility.h>
+#include <aspect/material_model/reaction_model/meltMagemin.h>
 
 namespace aspect
 {
@@ -43,7 +44,9 @@ namespace aspect
      */
 
     template <int dim>
-    class ReactiveFluidTransport : public MaterialModel::MeltInterface<dim>, public MaterialModel::MeltFractionModel<dim>, public ::aspect::SimulatorAccess<dim>
+    class ReactiveFluidTransport : public MaterialModel::MeltInterface<dim>,
+      public MaterialModel::MeltFractionModel<dim>,
+      public ::aspect::SimulatorAccess<dim>
     {
       public:
         /**
@@ -207,14 +210,19 @@ namespace aspect
         double fluid_reaction_time_scale;
 
         /*
-        * Object for computing Katz 2003 melt parameters
-        */
+         * Object for computing Katz 2003 melt parameters
+         */
         ReactionModel::Katz2003MantleMelting<dim> katz2003_model;
 
         /*
-        * Object for computing Tian 2019 parameterized solubility parameters
-        */
+         * Object for computing Tian 2019 parameterized solubility parameters
+         */
         ReactionModel::Tian2019Solubility<dim> tian2019_model;
+
+        /*
+         * Object for computing magemin melt parameters
+         */
+        ReactionModel::meltMagemin<dim> mageM;
 
         /**
          * Enumeration for selecting which type of scheme to use for
@@ -263,7 +271,8 @@ namespace aspect
           no_reaction,
           zero_solubility,
           tian_approximation,
-          katz2003
+          katz2003,
+          magemin
         };
         /**
          *  This variable is read from the parameter file through a parameter called 'Fluid-solid reaction scheme'.
@@ -274,3 +283,7 @@ namespace aspect
 }
 
 #endif
+
+
+
+

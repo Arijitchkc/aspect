@@ -94,6 +94,13 @@ namespace aspect
             melt_fractions[q] = katz2003_model.melt_fraction(in.temperature[q],
                                                              this->get_adiabatic_conditions().pressure(in.position[q]));
         }
+      else if (fluid_solid_reaction_scheme == magemin)
+        {
+          for (unsigned int q = 0; q < in.n_evaluation_points(); ++q)
+            melt_fractions[q] = mageM.guess_MeltFraction(
+                                  in.temperature[q],
+                                  this->get_adiabatic_conditions().pressure(in.position[q]), 0.01);
+        }
       else
         {
           Assert(out != nullptr,
@@ -186,7 +193,7 @@ namespace aspect
     {
       base_model->evaluate(in,out);
 
-      if (fluid_solid_reaction_scheme != katz2003)
+      if (fluid_solid_reaction_scheme != katz2003 && fluid_solid_reaction_scheme != magemin)
         {
           const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
 
@@ -213,7 +220,7 @@ namespace aspect
           // designed for two-phase flow material models in ASPECT that model the flow of melt,
           // but can be reused for a geofluid of arbitrary composition.
           const std::shared_ptr<MeltOutputs<dim>> fluid_out
-            = out.template get_additional_output_object<MeltOutputs<dim>>();
+                                               = out.template get_additional_output_object<MeltOutputs<dim>>();
 
 
           if (fluid_out != nullptr && in.requests_property(MaterialProperties::additional_outputs))
@@ -239,7 +246,7 @@ namespace aspect
             }
 
           const std::shared_ptr<ReactionRateOutputs<dim>> reaction_rate_out
-            = out.template get_additional_output_object<ReactionRateOutputs<dim>>();
+                                                       = out.template get_additional_output_object<ReactionRateOutputs<dim>>();
 
           if (this->get_parameters().use_operator_splitting && reaction_rate_out != nullptr
               && in.requests_property(MaterialProperties::reaction_rates))
@@ -345,6 +352,11 @@ namespace aspect
                 }
             }
         }
+      else if (fluid_solid_reaction_scheme == magemin)
+        {
+          mageM.calculate_reaction_rate_outputs(in, out, reference_T);
+          mageM.calculate_fluid_outputs(in, out, reference_T);
+        }
       else
         {
           katz2003_model.calculate_reaction_rate_outputs(in, out);
@@ -370,6 +382,12 @@ namespace aspect
           prm.enter_subsection("Tian 2019 model");
           {
             ReactionModel::Tian2019Solubility<dim>::declare_parameters(prm);
+          }
+          prm.leave_subsection();
+
+          prm.enter_subsection("magemin model");
+          {
+            ReactionModel::meltMagemin<dim>::declare_parameters(prm);
           }
           prm.leave_subsection();
 
@@ -428,16 +446,17 @@ namespace aspect
                              "time step used in the operator splitting scheme, otherwise reactions can not be "
                              "computed. If the model does not use operator splitting, this parameter is not used. "
                              "Units: yr or s, depending on the ``Use years instead of seconds'' parameter.");
-          prm.declare_entry ("Fluid-solid reaction scheme", "no reaction",
-                             Patterns::Selection("no reaction|zero solubility|tian approximation|katz2003"),
-                             "Select what type of scheme to use for reactions between fluid and solid phases. "
-                             "The current available options are models where no reactions occur between "
-                             "the two phases, or the solid phase is insoluble (zero solubility) and all "
-                             "of the bound fluid is released into the fluid phase, tian approximation "
-                             "use polynomials to describe hydration and dehydration reactions for four different "
-                             "rock compositions as defined in Tian et al., 2019, or the Katz et. al. 2003 mantle "
-                             "melting model. If the Katz 2003 melting model is used, its parameters are declared "
-                             "in its own subsection.");
+          prm.declare_entry("Fluid-solid reaction scheme", "no reaction",
+                            Patterns::Selection("no reaction|zero solubility|tian approximation|katz2003|magemin"),
+                            "Select what type of scheme to use for reactions between fluid and solid phases. "
+                            "The current available options are models where no reactions occur between "
+                            "the two phases, or the solid phase is insoluble (zero solubility) and all "
+                            "of the bound fluid is released into the fluid phase, tian approximation "
+                            "use polynomials to describe hydration and dehydration reactions for four different "
+                            "rock compositions as defined in Tian et al., 2019, or the Katz et. al. 2003 mantle "
+                            "melting model. If the Katz 2003 melting model is used, its parameters are declared "
+                            "in its own subsection. If magemin reaction model is used, its parameters are declared "
+                            "in its own subsection.");
           prm.declare_entry ("Reference temperature", "293.",
                              Patterns::Double (0.),
                              "The reference temperature $T_0$ for the katz2003 reaction model. "
@@ -514,6 +533,16 @@ namespace aspect
               }
               prm.leave_subsection();
             }
+          else if (prm.get("Fluid-solid reaction scheme") == "magemin")
+            {
+              fluid_solid_reaction_scheme = magemin;
+              prm.enter_subsection("magemin model");
+              {
+                mageM.initialize_simulator(this->get_simulator());
+                mageM.parse_parameters(prm);
+              }
+              prm.leave_subsection();
+            }
           else
             AssertThrow(false, ExcMessage("Not a valid fluid-solid reaction scheme"));
 
@@ -553,17 +582,48 @@ namespace aspect
                       ExcMessage("Material model Reactive Fluid Transport only "
                                  "works if there is a compositional field called porosity."));
 
-          if (fluid_solid_reaction_scheme != katz2003)
+          if (fluid_solid_reaction_scheme != katz2003
+              && fluid_solid_reaction_scheme != magemin)
             {
               AssertThrow(this->introspection().compositional_name_exists("bound_fluid"),
                           ExcMessage("Material model Reactive Fluid Transport only "
                                      "works if there is a compositional field called bound_fluid."));
             }
-          else
+          if (fluid_solid_reaction_scheme == katz2003)
             {
-              AssertThrow(this->introspection().compositional_name_exists("peridotite"),
-                          ExcMessage("Material model Katz 2003 Mantle Melting only "
-                                     "works if there is a compositional field called peridotite."));
+              AssertThrow(
+                this->introspection().compositional_name_exists("peridotite"),
+                ExcMessage("Material model Katz 2003 Mantle Melting only "
+                           "works if there is a compositional field called "
+                           "peridotite."));
+            }
+          if (fluid_solid_reaction_scheme == magemin)
+            {
+              AssertThrow(this->introspection().compositional_name_exists("SiO2"),
+                          ExcMessage("SiO2 field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("Al2O3"),
+                          ExcMessage("Al2O3 field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("CaO"),
+                          ExcMessage("CaO field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("MgO"),
+                          ExcMessage("MgO field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("FeO"),
+                          ExcMessage("FeOt field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("K2O"),
+                          ExcMessage("K2O field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("Na2O"),
+                          ExcMessage("Na2O field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("TiO2"),
+                          ExcMessage("TiO2 field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("O"),
+                          ExcMessage("O field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("Cr2O3"),
+                          ExcMessage("Cr2O3 field needed"));
+              AssertThrow(this->introspection().compositional_name_exists("H2O"),
+                          ExcMessage("H2O field needed"));
+              // AssertThrow(
+              //   this->introspection().compositional_name_exists("mageMeltFraction"),
+              //   ExcMessage("mageMeltFraction field needed"));
             }
         }
         prm.leave_subsection();
@@ -577,6 +637,12 @@ namespace aspect
         {
           AssertThrow(this->get_material_model().is_compressible() == false,
                       ExcMessage("The Fluid-reaction scheme zero solubility must be used with an incompressible base model."));
+        }
+
+      // Attaching a hook where magemin related data structure and variables can be initialized
+      if (fluid_solid_reaction_scheme == magemin)
+        {
+          mageM.initializeNewandModern();
         }
     }
 
@@ -611,3 +677,15 @@ namespace aspect
                                    "that is used as a base model.")
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
