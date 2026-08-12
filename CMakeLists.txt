@@ -92,7 +92,7 @@ else()
 endif()
 
 # Some other ASPECT configuration options:
-set(ASPECT_MAX_NUM_PARTICLE_SYSTEMS 2 CACHE STRING "The maximum number of particle systems supported at runtime.")
+set(ASPECT_MAX_NUM_PARTICLE_SYSTEMS 3 CACHE STRING "The maximum number of particle systems supported at runtime.")
 
 set(ASPECT_USE_TPETRA OFF CACHE BOOL "If ON, use Tpetra packages in Trilinos. Requires a Trilinos with Tpetra support and deal.II version 9.8.0 or newer.")
 
@@ -372,6 +372,32 @@ else()
 endif()
 
 
+# nanoflann is used by the generic unstructured lookup utility.
+list(APPEND ASPECT_INCLUDE_DIRS
+     "${CMAKE_SOURCE_DIR}/contrib/nanoflann/include")
+
+# MAGEMin and the TorchScript surrogate used by the MAGEMin reaction model.
+set(ASPECT_WITH_MAGEMIN ON CACHE BOOL "Whether to compile ASPECT with the bundled MAGEMin library.")
+message(STATUS "Using ASPECT_WITH_MAGEMIN = '${ASPECT_WITH_MAGEMIN}'")
+if(ASPECT_WITH_MAGEMIN)
+  set(MAGEMIN_SOURCE_DIR "${CMAKE_SOURCE_DIR}/contrib/MAGEMin")
+  add_subdirectory(${MAGEMIN_SOURCE_DIR})
+  list(APPEND ASPECT_INCLUDE_DIRS
+       "${MAGEMIN_SOURCE_DIR}/src"
+       "${MAGEMIN_SOURCE_DIR}/src/SB_database"
+       "${MAGEMIN_SOURCE_DIR}/src/TC_database")
+
+  set(ASPECT_WITH_LIBTORCH ON CACHE BOOL "Compile the MAGEMin neural-network surrogate with LibTorch.")
+  message(STATUS "Using ASPECT_WITH_LIBTORCH = '${ASPECT_WITH_LIBTORCH}'")
+  if(ASPECT_WITH_LIBTORCH)
+    find_package(Torch REQUIRED
+      HINTS ${LIBTORCH_DIR} $ENV{LIBTORCH_DIR})
+    list(APPEND ASPECT_INCLUDE_DIRS ${TORCH_INCLUDE_DIRS})
+    message(STATUS "Found LibTorch ${Torch_VERSION} at ${Torch_DIR}")
+  endif()
+endif()
+
+
 # WorldBuilder
 set(ASPECT_WITH_WORLD_BUILDER ON CACHE BOOL "Whether to enable compiling aspect with the Geodynamic World Builder.")
 message(STATUS "Using ASPECT_WITH_WORLD_BUILDER = '${ASPECT_WITH_WORLD_BUILDER}'")
@@ -540,7 +566,7 @@ install(FILES ${CMAKE_BINARY_DIR}/include/aspect/revision.h
 # floating point exceptions when converting -numeric_limits<double>::max to a
 # string. The only thing we can do is a configure check and disable the
 # exceptions. This is done here:
-set(ASPECT_USE_FP_EXCEPTIONS ON CACHE BOOL "If ON, floating point exception are raised in debug mode.")
+set(ASPECT_USE_FP_EXCEPTIONS OFF CACHE BOOL "If ON, floating point exception are raised in debug mode.")
 
 # Clang 6.0 throws random floating point exceptions, which we could not
 # track down. Disable the exceptions for now.
@@ -821,6 +847,17 @@ if(${PerpleX_FOUND})
   message(STATUS "Linking ASPECT against PerpleX")
   foreach(_T ${TARGET_EXECUTABLES})
     target_link_libraries(${_T} ${PerpleX_LIBRARIES})
+  endforeach()
+endif()
+
+# MAGEMin and LibTorch
+if(ASPECT_WITH_MAGEMIN)
+  message(STATUS "Linking ASPECT against MAGEMin")
+  foreach(_T ${TARGET_EXECUTABLES})
+    target_link_libraries(${_T} MAGEMin_cpp)
+    if(ASPECT_WITH_LIBTORCH)
+      target_link_libraries(${_T} ${TORCH_LIBRARIES})
+    endif()
   endforeach()
 endif()
 

@@ -98,8 +98,8 @@ namespace aspect
         {
           for (unsigned int q = 0; q < in.n_evaluation_points(); ++q)
             melt_fractions[q] = mageM.guess_MeltFraction(
-                                  in.temperature[q],
-                                  this->get_adiabatic_conditions().pressure(in.position[q]), 0.01);
+                                  this->get_adiabatic_conditions().pressure(in.position[q]),
+                                  in.temperature[q], 0.01);
         }
       else
         {
@@ -220,7 +220,7 @@ namespace aspect
           // designed for two-phase flow material models in ASPECT that model the flow of melt,
           // but can be reused for a geofluid of arbitrary composition.
           const std::shared_ptr<MeltOutputs<dim>> fluid_out
-                                               = out.template get_additional_output_object<MeltOutputs<dim>>();
+            = out.template get_additional_output_object<MeltOutputs<dim>>();
 
 
           if (fluid_out != nullptr && in.requests_property(MaterialProperties::additional_outputs))
@@ -246,7 +246,7 @@ namespace aspect
             }
 
           const std::shared_ptr<ReactionRateOutputs<dim>> reaction_rate_out
-                                                       = out.template get_additional_output_object<ReactionRateOutputs<dim>>();
+            = out.template get_additional_output_object<ReactionRateOutputs<dim>>();
 
           if (this->get_parameters().use_operator_splitting && reaction_rate_out != nullptr
               && in.requests_property(MaterialProperties::reaction_rates))
@@ -565,6 +565,14 @@ namespace aspect
                                      "and 'Reaction solver type = fixed step'."));
             }
 
+          if (fluid_solid_reaction_scheme == magemin)
+            {
+              AssertThrow(this->get_parameters().use_operator_splitting &&
+                          this->get_parameters().reaction_solver_type == Parameters<dim>::ReactionSolverType::fixed_step,
+                          ExcMessage("The Fluid-reaction scheme magemin must be used with operator splitting "
+                                     "and 'Reaction solver type = fixed step'."));
+            }
+
           if (this->get_parameters().use_operator_splitting)
             {
               if (this->get_parameters().reaction_solver_type == Parameters<dim>::ReactionSolverType::fixed_step)
@@ -659,6 +667,8 @@ namespace aspect
             std::make_unique<MaterialModel::ReactionRateOutputs<dim>> (out.n_evaluation_points(), this->n_compositional_fields()));
         }
       base_model->create_additional_named_outputs(out);
+      if (fluid_solid_reaction_scheme == magemin)
+        mageM.create_additional_named_outputs(out);
     }
   }
 }
@@ -677,15 +687,3 @@ namespace aspect
                                    "that is used as a base model.")
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
